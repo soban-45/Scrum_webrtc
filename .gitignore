@@ -1,0 +1,44 @@
+# ====================
+# Python / Django
+# ====================
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+*.env
+*.DS_Store
+
+# Django migrations
+**/migrations/
+!*/migrations/__init__.py
+
+# ====================
+# Node / React / Vite
+# ====================
+node_modules/
+dist/
+.vite/
+.cache/
+*.log
+*.local
+.env.local
+.env.*.local
+*.tsbuildinfo
+
+# ====================
+# VSCode / OS Specific
+# ====================
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
