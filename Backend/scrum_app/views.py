@@ -10,42 +10,84 @@ from datetime import datetime, timedelta
 from .serializers import ProjectSerializer, ProjectNameOnlySerializer
 from .models import Project, Employee
 import pandas as pd
+from django.utils.timezone import localtime
+from django.core.files import File
+from django.utils.timezone import now
+from io import BytesIO
+from openpyxl import load_workbook
+import os
+import json
+import requests
+import logging
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
 
 
 class EndConversationView(APIView):
-
     def post(self, request):
         try:
             conversation = request.data.get('conversation', [])
             project_id = request.data.get('project_id')
 
-            # Fetch project details
-            project = None
-            if project_id:
-                try:
-                    project = Project.objects.prefetch_related(
-                        'employees').get(id=project_id)
-                except Project.DoesNotExist:
-                    return Response({"error": "Project not found"}, status=404)
+            if not project_id:
+                return Response({"error": "project_id is required"}, status=400)
 
-            # Get structured data from conversation
+            # Fetch the project
+            try:
+                project = Project.objects.prefetch_related('employees').get(project_id=project_id)
+            except Project.DoesNotExist:
+                return Response({"error": "Project not found"}, status=404)
+
+            # Call GPT to summarize
             standup_data = summarize_standup_conversation(conversation)
 
-            # Add project & employee IDs into each standup entry
+            # Enrich each entry with project/employee info
             for entry in standup_data:
-                entry[
-                    "project_name"] = project.project_name if project else "Not specified"
+                entry["project_name"] = project.project_name
 
-                # match employee_id from project.employees based on name
                 emp = next(
                     (e for e in project.employees.all()
                      if e.employee_name.lower() == entry["name"].lower()),
                     None)
-                entry[
-                    "employee_id"] = emp.employee_id if emp else "Not specified"
+                entry["employee_id"] = emp.employee_id if emp else "Not specified"
 
-            # Save to Excel
-            save_standup_data(standup_data)
+            # ✅ Determine Excel file path
+            excel_dir = os.path.join(settings.MEDIA_ROOT, "project_excels")
+            os.makedirs(excel_dir, exist_ok=True)
+            excel_filename = f"standup_{project.project_id}.xlsx"
+            excel_path = os.path.join(excel_dir, excel_filename)
+
+            if not project.excel_file or not os.path.exists(project.excel_file.path):
+                excel_buffer = BytesIO()
+                save_standup_data(standup_data, excel_buffer)  # Modified to accept file-like objects
+                excel_buffer.seek(0)
+
+                # Save to FileField
+                project.excel_file.save(excel_filename, File(excel_buffer))
+                project.save()
+                excel_path = project.excel_file.path
+            else:
+                # Use existing file path for appending
+                excel_path = project.excel_file.path
+                save_standup_data(standup_data, excel_path)
+
+            # ✅ Save entries to DB
+            for entry in standup_data:
+                employee = next(
+                    (e for e in project.employees.all()
+                     if e.employee_name.lower() == entry["name"].lower()),
+                    None)
+
+                StandupEntry.objects.create(
+                    project=project,
+                    employee=employee,
+                    completed_yesterday=entry.get("completed_yesterday", "Not specified"),
+                    plan_today=entry.get("plan_today", "Not specified"),
+                    blockers=entry.get("blockers", "None"),
+                    summary=entry.get("summary", "")
+                )
 
             return Response({
                 "message": "Standup meeting saved successfully",
@@ -64,7 +106,7 @@ class ProjectAPIView(APIView):
         if project_id:
             try:
                 project = Project.objects.prefetch_related('employees').get(
-                    id=project_id)
+                    project_id=project_id)
                 serializer = ProjectSerializer(project)
                 return Response(serializer.data)
             except Project.DoesNotExist:
@@ -77,75 +119,57 @@ class ProjectAPIView(APIView):
             return Response(serializer.data)
 
 
-EXCEL_FILE = "standup_meetings.xlsx"
-
-
 class EmployeeLastStandupView(APIView):
 
     def get(self, request):
         employee_id = request.query_params.get("employee_id")
         if not employee_id:
-            return JsonResponse({"error": "employee_id is required"},
-                                status=400)
+            return JsonResponse({"error": "employee_id is required"}, status=400)
 
         try:
-            # Read the Excel file
-            df = pd.read_excel(EXCEL_FILE)
+            # Find the matching employee
+            try:
+                employee = Employee.objects.get(employee_id=employee_id)
+            except Employee.DoesNotExist:
+                return JsonResponse({"error": f"Employee ID {employee_id} not found"}, status=404)
 
-            if df.empty:
-                return JsonResponse({"error": "No data found in Excel"},
-                                    status=404)
+            # Compute "yesterday" (same timezone)
+            today = localtime(now()).date()
+            yesterday = today - timedelta(days=1)
 
-            # Convert Date column to datetime
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+            # Find standup entries from that day
+            standup_entry = (
+                StandupEntry.objects
+                .filter(employee=employee)
+                .filter(date__date=yesterday)
+                .order_by("-date")
+                .select_related("project")
+                .first()
+            )
 
-            # ✅ First, check if employee exists in Excel at all
-            df_all_emp = df[df["Employee ID"].astype(str) == str(employee_id)]
-            if df_all_emp.empty:
-                return JsonResponse(
-                    {
-                        "message":
-                        f"No records found for employee ID {employee_id}"
-                    },
-                    status=404)
+            if not standup_entry:
+                return JsonResponse({
+                    "message": f"No standup entry found for employee {employee_id} on {yesterday}"
+                }, status=404)
 
-            # ✅ Get the most recent standup entry for this employee
-            df_sorted = df_all_emp.sort_values("Date", ascending=False)
+            # Build response matching the Excel structure
+            response_data = {
+                "Date": localtime(standup_entry.date).strftime("%Y-%m-%d %H:%M:%S") if standup_entry.date else None,
+                "Project Name": standup_entry.project.project_name if standup_entry.project else "Not specified",
+                "Name": employee.employee_name or "Not specified",
+                "Employee ID": employee.employee_id or "Not specified",
+                "Completed Yesterday": standup_entry.completed_yesterday or "Not specified",
+                "Plan Today": standup_entry.plan_today or "Not specified",
+                "Blockers": standup_entry.blockers or "None",
+                "Summary": standup_entry.summary or ""
+            }
 
-            if df_sorted.empty:
-                return JsonResponse(
-                    {
-                        "message":
-                        f"No standup entry found for employee {employee_id}"
-                    },
-                    status=404)
+            return JsonResponse({"data": response_data})
 
-            # Get most recent record & replace NaN/NaT with None
-            last_record = df_sorted.iloc[0].where(
-                pd.notnull(df_sorted.iloc[0]), None).to_dict()
-
-            # Convert datetime to string for JSON serialization
-            if last_record.get("Date"):
-                last_record["Date"] = last_record["Date"].strftime(
-                    "%Y-%m-%d %H:%M:%S")
-
-            return JsonResponse({"data": last_record})
-
-        except FileNotFoundError:
-            return JsonResponse({"error": "Excel file not found"}, status=404)
         except Exception as e:
-            return JsonResponse({"error": f"Failed to read Excel: {str(e)}"},
-                                status=500)
+            return JsonResponse({"error": f"Failed to retrieve data: {str(e)}"}, status=500)
+        
 
-
-import os
-import json
-import requests
-import logging
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -225,23 +249,34 @@ def webrtc_signal(request):
                             status=500)
 
 
+
+EXCEL_FILE = "standup_meetings.xlsx"
+
+
 class DownloadExcelView(APIView):
-
     def get(self, request):
+        project_id = request.query_params.get('project_id')
+
+        if not project_id:
+            return Response({"error": "project_id query parameter is required"}, status=400)
+
         try:
-            excel_file_path = EXCEL_FILE
+            project = Project.objects.get(project_id=project_id)
 
-            if not os.path.exists(excel_file_path):
-                return Response({"error": "Excel file not found"}, status=404)
+            if not project.excel_file or not os.path.exists(project.excel_file.path):
+                return Response({"error": "Excel file not found for this project"}, status=404)
 
-            with open(excel_file_path, 'rb') as excel_file:
+            with open(project.excel_file.path, 'rb') as excel_file:
                 response = HttpResponse(
                     excel_file.read(),
                     content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
-                response['Content-Disposition'] = f'attachment; filename="standup_meetings.xlsx"'
-                response['Content-Length'] = os.path.getsize(excel_file_path)
+                filename = os.path.basename(project.excel_file.name)
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Length'] = os.path.getsize(project.excel_file.path)
                 return response
 
+        except Project.DoesNotExist:
+            return Response({"error": "Project not found"}, status=404)
         except Exception as e:
             return Response({"error": f"Failed to download Excel file: {str(e)}"}, status=500)

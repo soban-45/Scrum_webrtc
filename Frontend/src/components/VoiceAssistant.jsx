@@ -98,6 +98,7 @@ function VoiceAssistant() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
 
+  
   const fetchLastStandup = async (employeeId) => {
     if (!employeeId) {
       console.log("⚠️ No employee ID provided for last standup fetch");
@@ -1251,32 +1252,43 @@ CRITICAL RULES:
   };
 
   const downloadExcel = async () => {
-    setIsDownloading(true);
-    try {
-      const response = await fetch(`${BACKEND_URL}/download-excel/`);
-      
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
+  if (!selectedProject) {
+    alert("Please select a project first.");
+    return;
+  }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'standup_meetings.xlsx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      console.log("✅ Excel file downloaded successfully");
-    } catch (error) {
-      console.error("❌ Download error:", error);
-      alert("Failed to download Excel file. Please try again.");
-    } finally {
-      setIsDownloading(false);
+  setIsDownloading(true);
+  try {
+    const response = await fetch(`${BACKEND_URL}/download-excel/?project_id=${selectedProject}`);
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
     }
-  };
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Optional: Use project name or ID for filename
+    const filename = `standup_${selectedProject}.xlsx`;
+    link.download = filename;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    console.log("✅ Excel file downloaded successfully");
+  } catch (error) {
+    console.error("❌ Download error:", error);
+    alert("Failed to download Excel file. Please try again.");
+  } finally {
+    setIsDownloading(false);
+  }
+};
+
 
   const endConversation = async () => {
     setIsStopped(true);
@@ -1485,11 +1497,11 @@ CRITICAL RULES:
                 <option value="" disabled>
                   Select a project
                 </option>
-                {projectList.map((proj) => (
-                  <option key={proj.id} value={proj.id}>
-                    {proj.project_name}
-                  </option>
-                ))}
+                {projectList.map((project) => (
+    <option key={project.project_id} value={project.project_id}>
+      {project.project_name}
+    </option>
+  ))}
               </select>
             </Box>
           </Box>
