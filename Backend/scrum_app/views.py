@@ -8,7 +8,7 @@ import openai, tempfile, os, base64
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from .serializers import ProjectSerializer, ProjectNameOnlySerializer
-from .models import Project, Employee
+from .models import Project, Employee, StandupEntry
 import pandas as pd
 from django.utils.timezone import localtime
 from django.core.files import File

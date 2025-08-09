@@ -21,6 +21,10 @@ env.bak/
 **/migrations/
 !*/migrations/__init__.py
 
+
+project_excels/
+
+
 # ====================
 # Node / React / Vite
 # ====================

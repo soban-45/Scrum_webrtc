@@ -55,39 +55,6 @@ function LiveTranscript({ transcript, realtimeWords = [], currentWord = '', isUs
           </Typography>
         </Box>
 
-        {/* Real-time word-by-word display */}
-        {hasRealtimeWords && isUserSpeaking && (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ opacity: 0.8, mb: 1, display: 'block' }}>
-              Live:
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {realtimeWords.map((word, index) => (
-                <Chip
-                  key={`${word}-${index}`}
-                  label={word}
-                  size="small"
-                  sx={{
-                    backgroundColor: index === realtimeWords.length - 1 
-                      ? 'rgba(255, 255, 255, 0.9)' 
-                      : 'rgba(255, 255, 255, 0.7)',
-                    color: index === realtimeWords.length - 1 ? '#6c5ce7' : '#333',
-                    animation: index === realtimeWords.length - 1 
-                      ? 'wordPop 0.3s ease-out' : 'none',
-                    transform: index === realtimeWords.length - 1 
-                      ? 'scale(1.05)' : 'scale(1)',
-                    '@keyframes wordPop': {
-                      '0%': { transform: 'scale(0.8)', opacity: 0.5 },
-                      '50%': { transform: 'scale(1.1)', opacity: 0.8 },
-                      '100%': { transform: 'scale(1.05)', opacity: 1 }
-                    }
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-        )}
-
         {/* Final transcript display */}
         <Typography variant="body1" sx={{ 
           fontStyle: hasTranscript ? 'normal' : 'italic',
