@@ -21,8 +21,7 @@ import {
 import ConversationDisplay from "./ConversationDisplay";
 import LiveTranscript from "./LiveTranscript";
 
-const BACKEND_URL =
-  "http://localhost:8000"; // Replace with your backend URL
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const pulse = keyframes`
   0% { transform: scale(1); opacity: 1; }
@@ -98,7 +97,6 @@ function VoiceAssistant() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
 
-  
   const fetchLastStandup = async (employeeId) => {
     if (!employeeId) {
       console.log("⚠️ No employee ID provided for last standup fetch");
@@ -327,7 +325,7 @@ function VoiceAssistant() {
       .map((m) => {
         const last = lastPlansMap[m.employee_id];
         if (!last)
-          return `${m.name}: No previous standup data available - this will be their first standup.`;
+          return `${m.name}: No previous standup data available - this will be their first standup. Ask about: 1) What they accomplished yesterday, 2) Today's plans, 3) Any blockers from yesterday that might still affect them, 4) Any current blockers for today.`;
 
         const dateStr = last.Date
           ? new Date(last.Date).toLocaleDateString()
@@ -567,7 +565,10 @@ CRITICAL RULES:
           audioStateRef.current.isAudioPlaying = false;
           audioStateRef.current.audioEndedNaturally = true; // Set flag
           stopAudioProgressMonitoring(); // Stop monitoring
-          checkAndUnmuteMicrophone("audio_track_ended", audioStateRef.current.currentResponseId);
+          checkAndUnmuteMicrophone(
+            "audio_track_ended",
+            audioStateRef.current.currentResponseId,
+          );
         };
 
         remoteAudioRef.current.onpause = () => {
@@ -710,7 +711,7 @@ CRITICAL RULES:
         duration: isFinite(duration) ? duration.toFixed(1) : "∞",
         isPlaying,
         timeAdvancing,
-        ended: remoteAudio.ended
+        ended: remoteAudio.ended,
       });
 
       // If audio stopped advancing for more than 1 second, consider it finished
@@ -718,7 +719,10 @@ CRITICAL RULES:
         console.log("⚠️ Audio stopped advancing - considering finished");
         audioState.isAudioPlaying = false;
         stopAudioProgressMonitoring();
-        checkAndUnmuteMicrophone("audio_progress_stopped", audioState.currentResponseId);
+        checkAndUnmuteMicrophone(
+          "audio_progress_stopped",
+          audioState.currentResponseId,
+        );
       }
     }, 500); // Check every 500ms
   };
@@ -765,7 +769,8 @@ CRITICAL RULES:
     }
 
     // For other events, ensure all conditions are met and audio is truly finished
-    const allConditionsMet = !audioState.isAudioPlaying &&
+    const allConditionsMet =
+      !audioState.isAudioPlaying &&
       audioState.isTranscriptComplete &&
       audioState.isResponseComplete &&
       audioState.isAudioStreamComplete;
@@ -773,8 +778,9 @@ CRITICAL RULES:
     if (allConditionsMet) {
       // Double-check that audio element is not playing
       const remoteAudio = remoteAudioRef.current;
-      const isAudioElementPlaying = remoteAudio && 
-        !remoteAudio.paused && 
+      const isAudioElementPlaying =
+        remoteAudio &&
+        !remoteAudio.paused &&
         !remoteAudio.ended &&
         remoteAudio.readyState > 0;
 
@@ -899,7 +905,9 @@ CRITICAL RULES:
       }
 
       if (event.type === "output_audio_buffer.stopped") {
-        console.log("[OUTPUT AUDIO] Stopped - Audio playback has ended, unmuting microphone");
+        console.log(
+          "[OUTPUT AUDIO] Stopped - Audio playback has ended, unmuting microphone",
+        );
         audioStateRef.current.isAudioPlaying = false;
         audioStateRef.current.audioEndedNaturally = true;
         stopAudioProgressMonitoring();
@@ -1257,43 +1265,44 @@ CRITICAL RULES:
   };
 
   const downloadExcel = async () => {
-  if (!selectedProject) {
-    alert("Please select a project first.");
-    return;
-  }
-
-  setIsDownloading(true);
-  try {
-    const response = await fetch(`${BACKEND_URL}/download-excel/?project_id=${selectedProject}`);
-
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.status}`);
+    if (!selectedProject) {
+      alert("Please select a project first.");
+      return;
     }
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    setIsDownloading(true);
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/download-excel/?project_id=${selectedProject}`,
+      );
 
-    const link = document.createElement('a');
-    link.href = url;
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
 
-    // Optional: Use project name or ID for filename
-    const filename = `standup_${selectedProject}.xlsx`;
-    link.download = filename;
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+      const link = document.createElement("a");
+      link.href = url;
 
-    console.log("✅ Excel file downloaded successfully");
-  } catch (error) {
-    console.error("❌ Download error:", error);
-    alert("Failed to download Excel file. Please try again.");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+      // Optional: Use project name or ID for filename
+      const filename = `standup_${selectedProject}.xlsx`;
+      link.download = filename;
 
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log("✅ Excel file downloaded successfully");
+    } catch (error) {
+      console.error("❌ Download error:", error);
+      alert("Failed to download Excel file. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const endConversation = async () => {
     setIsStopped(true);
@@ -1315,7 +1324,9 @@ CRITICAL RULES:
         setConversation([]);
         setLiveTranscript("");
         setShowDownloadButton(true); // Show download button after successful save
-        console.log("✅ Standup data saved successfully - Download now available");
+        console.log(
+          "✅ Standup data saved successfully - Download now available",
+        );
       }
     } catch (err) {
       console.error("Save Error:", err);
@@ -1503,10 +1514,10 @@ CRITICAL RULES:
                   Select a project
                 </option>
                 {projectList.map((project) => (
-    <option key={project.project_id} value={project.project_id}>
-      {project.project_name}
-    </option>
-  ))}
+                  <option key={project.project_id} value={project.project_id}>
+                    {project.project_name}
+                  </option>
+                ))}
               </select>
             </Box>
           </Box>
@@ -1686,7 +1697,9 @@ CRITICAL RULES:
             !isAssistantSpeaking &&
             sessionConfigured &&
             "⏸️ Your turn to speak"}
-          {showDownloadButton && !isListening && "📊 Standup complete - Download Excel file available"}
+          {showDownloadButton &&
+            !isListening &&
+            "📊 Standup complete - Download Excel file available"}
         </Typography>
       </Box>
     </Box>

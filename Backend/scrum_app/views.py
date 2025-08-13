@@ -102,6 +102,7 @@ class ProjectAPIView(APIView):
 
     def get(self, request):
         project_id = request.query_params.get('project_id')
+        email = request.query_params.get('email')
 
         if project_id:
             try:
@@ -113,8 +114,21 @@ class ProjectAPIView(APIView):
                 return Response({"error": "Project not found."},
                                 status=status.HTTP_404_NOT_FOUND)
         else:
-            # Return only project names
-            projects = Project.objects.all()
+            # Filter projects by employee email if provided
+            if email:
+                try:
+                    employee = Employee.objects.get(email=email)
+                    projects = Project.objects.filter(employees=employee)
+                    if not projects.exists():
+                        return Response({"error": "No projects found for this email."},
+                                        status=status.HTTP_404_NOT_FOUND)
+                except Employee.DoesNotExist:
+                    return Response({"error": "Employee with this email not found."},
+                                    status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Return all projects if no email filter
+                projects = Project.objects.all()
+            
             serializer = ProjectNameOnlySerializer(projects, many=True)
             return Response(serializer.data)
 
