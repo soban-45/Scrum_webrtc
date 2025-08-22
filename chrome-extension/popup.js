@@ -27,7 +27,7 @@ function showPopupCard() {
     </div>
     <div class="ai-scrum-popup-content" id="popup-content">
       <div class="ai-scrum-status-display">
-        <span>Status: Bot Admitted</span>
+        <span>Status: Ready</span>
         <div class="ai-scrum-indicator ready"></div>
       </div>
       <div class="ai-scrum-popup-buttons">
@@ -146,32 +146,79 @@ function setupPopupEventListeners(popup) {
     }
   });
 
-  // Start session
+  // Start session (establish WebRTC connection and then trigger AI to speak)
   startBtn.addEventListener('click', () => {
-    console.log('[Content] Starting AI session');
+    console.log('[Content] Start clicked: establishing WebRTC connection');
     startBtn.disabled = true;
     stopBtn.disabled = false;
 
-    // Update status
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
     statusDisplay.textContent = 'Status: Connecting...';
     indicator.className = 'ai-scrum-indicator connecting';
 
-    // Connect to WebRTC
-    chrome.runtime.sendMessage({ action: "connectWebRTC" }, (response) => {
-      if (response && response.success) {
-        statusDisplay.textContent = 'Status: Active';
-        indicator.className = 'ai-scrum-indicator active';
-        console.log('[Content] AI session started - WebRTC connected');
-      } else {
-        statusDisplay.textContent = 'Status: Connection Failed';
-        indicator.className = 'ai-scrum-indicator error';
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        console.error('[Content] WebRTC connection failed:', response?.error);
-      }
-    });
+    // First establish WebRTC connection
+    try {
+      chrome.runtime.sendMessage({ action: "connectWebRTC" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Content] Extension error:', chrome.runtime.lastError);
+          statusDisplay.textContent = 'Status: Extension Error';
+          indicator.className = 'ai-scrum-indicator error';
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          return;
+        }
+        
+        if (response && response.success) {
+          statusDisplay.textContent = 'Status: Connected';
+          indicator.className = 'ai-scrum-indicator ready';
+          
+          // Now trigger AI to speak
+          try {
+            chrome.runtime.sendMessage({ action: 'startSpeaking' }, (speakResponse) => {
+              if (chrome.runtime.lastError) {
+                console.error('[Content] Extension error on speak:', chrome.runtime.lastError);
+                statusDisplay.textContent = 'Status: Extension Error';
+                indicator.className = 'ai-scrum-indicator error';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                return;
+              }
+              
+              if (speakResponse && speakResponse.success) {
+                statusDisplay.textContent = 'Status: Active';
+                indicator.className = 'ai-scrum-indicator active';
+                console.log('[Content] AI speaking started');
+              } else {
+                statusDisplay.textContent = 'Status: Speaking Failed';
+                indicator.className = 'ai-scrum-indicator error';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                console.error('[Content] Start speaking failed:', speakResponse?.error);
+              }
+            });
+          } catch (err) {
+            console.error('[Content] Error sending startSpeaking:', err);
+            statusDisplay.textContent = 'Status: Extension Error';
+            indicator.className = 'ai-scrum-indicator error';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+          }
+        } else {
+          statusDisplay.textContent = 'Status: Connection Failed';
+          indicator.className = 'ai-scrum-indicator error';
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          console.error('[Content] WebRTC connection failed:', response?.error);
+        }
+      });
+    } catch (err) {
+      console.error('[Content] Error sending connectWebRTC:', err);
+      statusDisplay.textContent = 'Status: Extension Error';
+      indicator.className = 'ai-scrum-indicator error';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
   });
 
   // Stop session
@@ -187,10 +234,14 @@ function setupPopupEventListeners(popup) {
     indicator.className = 'ai-scrum-indicator ready';
 
     // Send stop message to background script
-    chrome.runtime.sendMessage({
-      action: 'stopBot',
-      meetUrl: window.location.href
-    });
+    try {
+      chrome.runtime.sendMessage({
+        action: 'stopBot',
+        meetUrl: window.location.href
+      });
+    } catch (err) {
+      console.error('[Content] Error sending stopBot:', err);
+    }
   });
 
   // Setup minimized state buttons
@@ -198,15 +249,14 @@ function setupPopupEventListeners(popup) {
   const minimizedStopBtn = popup.querySelector('#minimized-stop-btn');
   const expandBtn = popup.querySelector('#expand-btn');
 
-  // Minimized start button
+  // Minimized start button (establish WebRTC connection and then trigger AI to speak)
   minimizedStartBtn.addEventListener('click', () => {
-    console.log('[Content] Starting AI session (minimized)');
+    console.log('[Content] Start clicked (minimized): establishing WebRTC connection');
     minimizedStartBtn.disabled = true;
     minimizedStopBtn.disabled = false;
     startBtn.disabled = true;
     stopBtn.disabled = false;
 
-    // Update status in normal view (if visible)
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
     if (statusDisplay && indicator) {
@@ -214,26 +264,96 @@ function setupPopupEventListeners(popup) {
       indicator.className = 'ai-scrum-indicator connecting';
     }
 
-    // Connect to WebRTC
-    chrome.runtime.sendMessage({ action: "connectWebRTC" }, (response) => {
-      if (response && response.success) {
-        if (statusDisplay && indicator) {
-          statusDisplay.textContent = 'Status: Active';
-          indicator.className = 'ai-scrum-indicator active';
+    // First establish WebRTC connection
+    try {
+      chrome.runtime.sendMessage({ action: "connectWebRTC" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Content] Extension error (minimized):', chrome.runtime.lastError);
+          if (statusDisplay && indicator) {
+            statusDisplay.textContent = 'Status: Extension Error';
+            indicator.className = 'ai-scrum-indicator error';
+          }
+          minimizedStartBtn.disabled = false;
+          minimizedStopBtn.disabled = true;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          return;
         }
-        console.log('[Content] AI session started - WebRTC connected');
-      } else {
-        if (statusDisplay && indicator) {
-          statusDisplay.textContent = 'Status: Connection Failed';
-          indicator.className = 'ai-scrum-indicator error';
+        
+        if (response && response.success) {
+          if (statusDisplay && indicator) {
+            statusDisplay.textContent = 'Status: Connected';
+            indicator.className = 'ai-scrum-indicator ready';
+          }
+          
+          // Now trigger AI to speak
+          try {
+            chrome.runtime.sendMessage({ action: 'startSpeaking' }, (speakResponse) => {
+              if (chrome.runtime.lastError) {
+                console.error('[Content] Extension error on speak (minimized):', chrome.runtime.lastError);
+                if (statusDisplay && indicator) {
+                  statusDisplay.textContent = 'Status: Extension Error';
+                  indicator.className = 'ai-scrum-indicator error';
+                }
+                minimizedStartBtn.disabled = false;
+                minimizedStopBtn.disabled = true;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                return;
+              }
+              
+              if (speakResponse && speakResponse.success) {
+                if (statusDisplay && indicator) {
+                  statusDisplay.textContent = 'Status: Active';
+                  indicator.className = 'ai-scrum-indicator active';
+                }
+                console.log('[Content] AI speaking started');
+              } else {
+                if (statusDisplay && indicator) {
+                  statusDisplay.textContent = 'Status: Speaking Failed';
+                  indicator.className = 'ai-scrum-indicator error';
+                }
+                minimizedStartBtn.disabled = false;
+                minimizedStopBtn.disabled = true;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                console.error('[Content] Start speaking failed:', speakResponse?.error);
+              }
+            });
+          } catch (err) {
+            console.error('[Content] Error sending startSpeaking (minimized):', err);
+            if (statusDisplay && indicator) {
+              statusDisplay.textContent = 'Status: Extension Error';
+              indicator.className = 'ai-scrum-indicator error';
+            }
+            minimizedStartBtn.disabled = false;
+            minimizedStopBtn.disabled = true;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+          }
+        } else {
+          if (statusDisplay && indicator) {
+            statusDisplay.textContent = 'Status: Connection Failed';
+            indicator.className = 'ai-scrum-indicator error';
+          }
+          minimizedStartBtn.disabled = false;
+          minimizedStopBtn.disabled = true;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          console.error('[Content] WebRTC connection failed:', response?.error);
         }
-        minimizedStartBtn.disabled = false;
-        minimizedStopBtn.disabled = true;
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        console.error('[Content] WebRTC connection failed:', response?.error);
+      });
+    } catch (err) {
+      console.error('[Content] Error sending connectWebRTC (minimized):', err);
+      if (statusDisplay && indicator) {
+        statusDisplay.textContent = 'Status: Extension Error';
+        indicator.className = 'ai-scrum-indicator error';
       }
-    });
+      minimizedStartBtn.disabled = false;
+      minimizedStopBtn.disabled = true;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
   });
 
   // Minimized stop button
