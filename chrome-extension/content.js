@@ -12,6 +12,13 @@ let isUserSpeaking = false;
 let userAudioTrack = null;
 let userStream = null;
 
+// Audio processing and monitoring
+let audioContext = null;
+let analyser = null;
+let audioProcessor = null;
+let noiseSuppression = null;
+let volumeLevel = 0;
+
 // Audio completion tracking
 let audioState = {
   isAudioPlaying: false,
@@ -33,6 +40,280 @@ function createRemoteAudioElement() {
     remoteAudioElement.style.display = "none";
     document.body.appendChild(remoteAudioElement);
     console.log("[AI SCRUM] Remote audio element created");
+  }
+}
+
+// Enhanced microphone setup with headphone optimization
+async function setupMicrophone() {
+  try {
+    console.log("[MIC] Setting up enhanced microphone with headphone optimization");
+    
+    // Enhanced microphone settings optimized for headphones
+    userStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1,
+        latency: 0.01,
+        volume: 0.7, // Reduced volume to prevent feedback with headphones
+        // Chrome-specific enhanced settings for headphones
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
+        googEchoCancellation2: true,
+        googDAEchoCancellation: true,
+        googTypingNoiseDetection: true,
+        googBeamforming: true,
+        googArrayGeometry: true,
+        googAudioMirroring: false,
+        // Additional headphone-specific settings
+        googNoiseSuppression2: true,
+        googEchoCancellation3: true,
+        googAecRefDelay: 0.01,
+        googAecExtendedFilter: true,
+      },
+    });
+
+    userAudioTrack = userStream.getAudioTracks()[0];
+    console.log("[MIC] Microphone access granted with headphone optimization:", userAudioTrack.label);
+    console.log("[MIC] Track details:", {
+      label: userAudioTrack.label,
+      enabled: userAudioTrack.enabled,
+      readyState: userAudioTrack.readyState,
+      muted: userAudioTrack.muted,
+      kind: userAudioTrack.kind
+    });
+
+    // Enhanced audio processing pipeline for headphones
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 48000,
+      latencyHint: "interactive",
+    });
+
+    const source = audioContext.createMediaStreamSource(userStream);
+
+    // Create analyser for volume monitoring with headphone-optimized settings
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048; // Higher resolution for better headphone detection
+    analyser.smoothingTimeConstant = 0.9; // More aggressive smoothing
+    analyser.minDecibels = -80; // Better sensitivity for headphones
+    analyser.maxDecibels = -20;
+
+    // Multi-stage audio processing for headphones
+    let audioChain = source;
+
+    // 1. High-pass filter to remove low-frequency noise
+    if (audioContext.createBiquadFilter) {
+      const highPassFilter = audioContext.createBiquadFilter();
+      highPassFilter.type = "highpass";
+      highPassFilter.frequency.setValueAtTime(100, audioContext.currentTime);
+      highPassFilter.Q.setValueAtTime(0.7, audioContext.currentTime);
+      audioChain.connect(highPassFilter);
+      audioChain = highPassFilter;
+    }
+
+    // 2. Dynamic range compressor for consistent levels
+    if (audioContext.createDynamicsCompressor) {
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-30, audioContext.currentTime); // More aggressive for headphones
+      compressor.knee.setValueAtTime(40, audioContext.currentTime);
+      compressor.ratio.setValueAtTime(8, audioContext.currentTime);
+      compressor.attack.setValueAtTime(0.001, audioContext.currentTime); // Faster attack
+      compressor.release.setValueAtTime(0.1, audioContext.currentTime); // Faster release
+      audioChain.connect(compressor);
+      audioChain = compressor;
+    }
+
+    // 3. Noise gate to prevent headphone bleed
+    const noiseGate = audioContext.createGain();
+    noiseGate.gain.setValueAtTime(0.2, audioContext.currentTime); // Lower threshold
+    noiseSuppression = noiseGate;
+    audioChain.connect(noiseGate);
+    audioChain = noiseGate;
+
+    // Connect to analyser for monitoring
+    audioChain.connect(analyser);
+
+    // Start volume monitoring
+    monitorAudioLevels();
+
+    // Start periodic popup updates to ensure UI stays responsive
+    startPeriodicPopupUpdates();
+
+    return true;
+  } catch (error) {
+    console.error("[MIC] Microphone setup error:", error);
+    throw error;
+  }
+}
+
+// Monitor audio levels for volume visualization
+function monitorAudioLevels() {
+  if (!analyser) {
+    console.log("[VOLUME] No analyser available for volume monitoring");
+    return;
+  }
+
+  console.log("[VOLUME] Starting volume monitoring...");
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+  const frequencyData = new Uint8Array(bufferLength);
+
+  let lastVolumeLog = 0;
+  let speechDetected = false;
+
+  const checkAudioLevel = () => {
+    if (!analyser) return;
+
+    analyser.getByteFrequencyData(dataArray);
+    analyser.getByteTimeDomainData(frequencyData);
+
+    // Enhanced volume calculation for headphones
+    let sum = 0;
+    let peakLevel = 0;
+
+    // Focus on mid-frequency range where speech occurs (300Hz-3400Hz)
+    const speechStartBin = Math.floor((300 / (48000 / 2)) * bufferLength);
+    const speechEndBin = Math.floor((3400 / (48000 / 2)) * bufferLength);
+
+    for (let i = speechStartBin; i < speechEndBin; i++) {
+      sum += dataArray[i];
+      peakLevel = Math.max(peakLevel, dataArray[i]);
+    }
+
+    const speechRange = speechEndBin - speechStartBin;
+    const average = sum / speechRange;
+
+    // Use RMS calculation for more accurate speech detection
+    let rms = 0;
+    for (let i = 0; i < frequencyData.length; i++) {
+      const sample = (frequencyData[i] - 128) / 128;
+      rms += sample * sample;
+    }
+    rms = Math.sqrt(rms / frequencyData.length);
+
+    // Combine average and RMS for better headphone speech detection
+    const combinedLevel = (average / 255) * 0.7 + rms * 0.3;
+
+    // Adaptive noise gate based on recent background levels
+    const adaptiveNoiseGate = isAssistantSpeaking ? 0.05 : 0.15; // Lower when AI speaking
+    const adjustedVolume = combinedLevel > adaptiveNoiseGate ? combinedLevel : 0;
+
+    const newVolumeLevel = Math.min(adjustedVolume * 150, 100); // Amplify valid speech
+    
+    // Only update if there's a significant change to avoid spam
+    if (Math.abs(newVolumeLevel - volumeLevel) > 2) {
+      volumeLevel = newVolumeLevel;
+      
+      // Log volume changes for debugging
+      if (volumeLevel > 10 && !speechDetected) {
+        console.log(`🎤 [VOLUME] Speech detected! Level: ${volumeLevel.toFixed(1)}%`);
+        speechDetected = true;
+      } else if (volumeLevel < 5 && speechDetected) {
+        console.log(`🔇 [VOLUME] Speech ended. Level: ${volumeLevel.toFixed(1)}%`);
+        speechDetected = false;
+      }
+      
+      // Log significant volume changes
+      if (volumeLevel > 20 && Date.now() - lastVolumeLog > 1000) {
+        console.log(`📊 [VOLUME] Current level: ${volumeLevel.toFixed(1)}% (Peak: ${peakLevel}, RMS: ${rms.toFixed(3)})`);
+        lastVolumeLog = Date.now();
+      }
+    }
+
+    // Update popup with volume level and microphone status
+    updatePopupMicrophoneStatus();
+
+    // Continue monitoring
+    requestAnimationFrame(checkAudioLevel);
+  };
+
+  checkAudioLevel();
+}
+
+// Update popup with microphone status and volume level
+function updatePopupMicrophoneStatus() {
+  if (window.AIScrumPopup && window.AIScrumPopup.updateMicrophoneStatus) {
+    let status = 'Ready';
+    if (isAssistantSpeaking) {
+      status = 'Muted';
+    } else if (isUserSpeaking) {
+      status = 'Listening';
+    } else if (isConnected) {
+      status = 'Ready';
+    }
+    
+    // Log popup updates for debugging
+    console.log(`🔄 [POPUP] Updating status: ${status}, Volume: ${volumeLevel.toFixed(1)}%`);
+    
+    window.AIScrumPopup.updateMicrophoneStatus(status, volumeLevel);
+  } else {
+    console.log("[POPUP] Popup not available for status update");
+  }
+}
+
+// Start periodic popup updates to ensure UI stays responsive
+function startPeriodicPopupUpdates() {
+  console.log("[POPUP] Starting periodic popup updates...");
+  
+  // Update popup every 100ms to ensure smooth volume bar animation
+  setInterval(() => {
+    if (isConnected) {
+      updatePopupMicrophoneStatus();
+    }
+  }, 100);
+}
+
+// Enhanced mute microphone function
+function muteMicrophone() {
+  if (userAudioTrack && userAudioTrack.readyState === "live") {
+    userAudioTrack.enabled = false;
+    console.log("🔇 MICROPHONE MUTED - AI is speaking, user mic disabled");
+
+    // Apply noise gate to minimize headphone bleed without suspending context
+    if (noiseSuppression && audioContext) {
+      noiseSuppression.gain.setValueAtTime(0.01, audioContext.currentTime);
+      console.log("🔇 Applied aggressive noise gate for headphone protection");
+    }
+
+    // Update popup status
+    updatePopupMicrophoneStatus();
+  } else {
+    console.warn("⚠️ Cannot mute microphone: track not available or not live");
+    console.log("Track state:", userAudioTrack ? {
+      readyState: userAudioTrack.readyState,
+      enabled: userAudioTrack.enabled,
+      kind: userAudioTrack.kind,
+      label: userAudioTrack.label,
+    } : "No track");
+  }
+}
+
+// Enhanced unmute microphone function
+function unmuteMicrophone() {
+  if (userAudioTrack && userAudioTrack.readyState === "live") {
+    userAudioTrack.enabled = true;
+    console.log("🎤 MICROPHONE UNMUTED - User can speak now");
+
+    // Restore normal noise gate level
+    if (noiseSuppression && audioContext) {
+      noiseSuppression.gain.setValueAtTime(0.2, audioContext.currentTime);
+      console.log("🎤 Restored normal noise gate level for user speech");
+    }
+
+    // Update popup status
+    updatePopupMicrophoneStatus();
+  } else {
+    console.warn("⚠️ Cannot unmute microphone: track not available or not live");
+    console.log("Track state:", userAudioTrack ? {
+      readyState: userAudioTrack.readyState,
+      enabled: userAudioTrack.enabled,
+      kind: userAudioTrack.kind,
+      label: userAudioTrack.label,
+    } : "No track");
   }
 }
 
@@ -101,6 +382,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       userStream.getTracks().forEach(track => track.stop());
       userStream = null;
       userAudioTrack = null;
+    }
+
+    // Close audio context
+    if (audioContext) {
+      audioContext.close();
+      audioContext = null;
     }
     
     dataChannel = null;
@@ -191,18 +478,8 @@ async function connectToAIBot() {
     });
     setupDataChannel();
 
-    // Get mic
-    userStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000,
-        channelCount: 1,
-        latency: 0.01,
-      },
-    });
-    userAudioTrack = userStream.getAudioTracks()[0];
+    // Setup enhanced microphone with headphone optimization
+    await setupMicrophone();
     peerConnection.addTrack(userAudioTrack, userStream);
 
     // Remote audio
@@ -212,18 +489,39 @@ async function connectToAIBot() {
       if (remoteAudioElement) {
         remoteAudioElement.srcObject = event.streams[0];
         
-        // Add event listeners for audio completion
-        remoteAudioElement.addEventListener('ended', () => {
-          console.log("🎵 Remote audio ended naturally");
-          audioState.audioEndedNaturally = true;
+        // Enhanced event listeners for audio completion
+        remoteAudioElement.onplaying = () => {
+          console.log("🔊 Assistant audio started playing - mic muted");
+          isAssistantSpeaking = true;
+          audioState.isAudioPlaying = true;
+          audioState.audioEndedNaturally = false; // Reset flag
+          startAudioProgressMonitoring(); // Start monitoring progress
+          muteMicrophone(); // Ensure mic is muted when audio starts
+        };
+
+        remoteAudioElement.onended = () => {
+          console.log("🔇 Assistant audio ended naturally");
           audioState.isAudioPlaying = false;
-          checkAndUnmuteMicrophone("audio_ended", audioState.currentResponseId);
-        });
-        
-        remoteAudioElement.addEventListener('pause', () => {
-          console.log("⏸️ Remote audio paused");
+          audioState.audioEndedNaturally = true; // Set flag
+          stopAudioProgressMonitoring(); // Stop monitoring
+          checkAndUnmuteMicrophone("audio_track_ended", audioState.currentResponseId);
+        };
+
+        remoteAudioElement.onpause = () => {
+          console.log("⏸️ Assistant audio paused");
           audioState.isAudioPlaying = false;
+          stopAudioProgressMonitoring();
           checkAndUnmuteMicrophone("audio_paused", audioState.currentResponseId);
+        };
+
+        // Additional safety check for when audio stops
+        remoteAudioElement.addEventListener("loadstart", () => {
+          console.log("🎵 New audio track loading");
+          audioState.isAudioPlaying = true;
+          audioState.audioEndedNaturally = false; // Reset on new load
+          startAudioProgressMonitoring(); // Start monitoring
+          isAssistantSpeaking = true;
+          muteMicrophone();
         });
       }
     };
@@ -314,25 +612,6 @@ function startAIConversation() {
   sendData(welcomeMessage);
 }
 
-// Mic management functions
-function muteMicrophone() {
-  if (userAudioTrack && userAudioTrack.readyState === "live") {
-    userAudioTrack.enabled = false;
-    console.log("🔇 MICROPHONE MUTED - AI is speaking, user mic disabled");
-  } else {
-    console.warn("⚠️ Cannot mute microphone: track not available or not live");
-  }
-}
-
-function unmuteMicrophone() {
-  if (userAudioTrack && userAudioTrack.readyState === "live") {
-    userAudioTrack.enabled = true;
-    console.log("🎤 MICROPHONE UNMUTED - User can speak now");
-  } else {
-    console.warn("⚠️ Cannot unmute microphone: track not available or not live");
-  }
-}
-
 // Audio completion checking
 function checkAndUnmuteMicrophone(eventType, responseId) {
   console.log(`📊 Audio completion check from ${eventType}:`, {
@@ -401,15 +680,32 @@ function startAudioProgressMonitoring() {
   
   audioState.audioProgressCheckInterval = setInterval(() => {
     const remoteAudio = remoteAudioElement;
-    if (remoteAudio && !remoteAudio.paused && !remoteAudio.ended) {
-      audioState.lastAudioTime = remoteAudio.currentTime;
-    } else {
-      console.log("🎵 Audio monitoring: Audio has stopped");
+    if (!remoteAudio) return;
+
+    const currentTime = remoteAudio.currentTime;
+    const duration = remoteAudio.duration;
+    const isPlaying = !remoteAudio.paused && !remoteAudio.ended;
+
+    // Check if audio time is advancing
+    const timeAdvancing = currentTime > audioState.lastAudioTime;
+    audioState.lastAudioTime = currentTime;
+
+    console.log("🎵 Audio progress:", {
+      currentTime: currentTime.toFixed(1),
+      duration: isFinite(duration) ? duration.toFixed(1) : "∞",
+      isPlaying,
+      timeAdvancing,
+      ended: remoteAudio.ended,
+    });
+
+    // If audio stopped advancing for more than 1 second, consider it finished
+    if (!timeAdvancing && isPlaying && currentTime > 0) {
+      console.log("⚠️ Audio stopped advancing - considering finished");
       audioState.isAudioPlaying = false;
       stopAudioProgressMonitoring();
-      checkAndUnmuteMicrophone("audio_monitoring", audioState.currentResponseId);
+      checkAndUnmuteMicrophone("audio_progress_stopped", audioState.currentResponseId);
     }
-  }, 100);
+  }, 500); // Check every 500ms
 }
 
 function stopAudioProgressMonitoring() {
@@ -506,25 +802,31 @@ function handleServerEvent(event) {
 
     // Handle input audio events
     if (event.type === "input_audio_buffer.speech_started") {
-      console.log("👂 User started speaking");
+      console.log("👂 [USER SPEECH] User started speaking - VAD detected");
+      console.log("📊 [USER SPEECH] Current volume level:", volumeLevel.toFixed(1) + "%");
       isUserSpeaking = true;
+      updatePopupMicrophoneStatus();
       return;
     }
 
     if (event.type === "input_audio_buffer.speech_stopped") {
-      console.log("🛑 User finished speaking");
+      console.log("🛑 [USER SPEECH] User finished speaking - VAD ended");
+      console.log("📊 [USER SPEECH] Final volume level:", volumeLevel.toFixed(1) + "%");
       isUserSpeaking = false;
+      updatePopupMicrophoneStatus();
       return;
     }
 
     // Handle input audio transcription events
     if (event.type === "conversation.item.input_audio_transcription.completed") {
-      console.log("📝 User said:", event.transcript);
+      console.log("📝 [TRANSCRIPTION] User said:", event.transcript);
+      console.log("📊 [TRANSCRIPTION] Volume level during speech:", volumeLevel.toFixed(1) + "%");
       if (event.transcript && event.transcript.trim()) {
+        console.log("⏰ [TRANSCRIPTION] Waiting 2 seconds before AI can respond...");
         // Wait 2 seconds after user finishes speaking before AI responds
         setTimeout(() => {
           if (!isAssistantSpeaking && isConnected) {
-            console.log("⏰ 2 seconds passed, AI can respond now");
+            console.log("⏰ [TRANSCRIPTION] 2 seconds passed, AI can respond now");
             // AI will automatically respond based on the conversation
           }
         }, 2000);
@@ -615,6 +917,29 @@ function waitForToolbar() {
     setTimeout(waitForToolbar, 2000);
   }
 }
+
+// Test function to verify microphone is working
+function testMicrophone() {
+  console.log("🧪 [TEST] Testing microphone functionality...");
+  console.log("🧪 [TEST] Current volume level:", volumeLevel.toFixed(1) + "%");
+  console.log("🧪 [TEST] Is user speaking:", isUserSpeaking);
+  console.log("🧪 [TEST] Is assistant speaking:", isAssistantSpeaking);
+  console.log("🧪 [TEST] Audio context state:", audioContext ? audioContext.state : "No audio context");
+  console.log("🧪 [TEST] Analyser available:", !!analyser);
+  console.log("🧪 [TEST] User audio track:", userAudioTrack ? {
+    enabled: userAudioTrack.enabled,
+    readyState: userAudioTrack.readyState,
+    muted: userAudioTrack.muted
+  } : "No track");
+  
+  // Test popup update
+  updatePopupMicrophoneStatus();
+  
+  console.log("🧪 [TEST] Microphone test completed. Speak to see volume changes!");
+}
+
+// Expose test function globally for debugging
+window.testAIScrumMicrophone = testMicrophone;
 
 // Run after page loads
 window.addEventListener("load", () => {

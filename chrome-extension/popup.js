@@ -30,6 +30,18 @@ function showPopupCard() {
         <span>Status: Ready</span>
         <div class="ai-scrum-indicator ready"></div>
       </div>
+      <div class="ai-scrum-microphone-status">
+        <div class="mic-status">
+          <span class="mic-icon">🎤</span>
+          <span class="mic-text">Microphone: Ready</span>
+        </div>
+        <div class="volume-indicator">
+          <div class="volume-bar">
+            <div class="volume-fill" id="volume-fill"></div>
+          </div>
+          <span class="volume-text" id="volume-text">0%</span>
+        </div>
+      </div>
       <div class="ai-scrum-popup-buttons">
         <button class="ai-scrum-popup-btn start-btn" id="start-session-btn">
           <span>▶</span> Start Session
@@ -413,7 +425,55 @@ function loadPopupStyles() {
 // Initialize popup styles when the script loads
 loadPopupStyles();
 
+// Function to update microphone status and volume level
+function updateMicrophoneStatus(status, volumeLevel = 0) {
+  const popup = document.getElementById('ai-scrum-popup-card');
+  if (!popup) {
+    console.log("[POPUP] No popup found for status update");
+    return;
+  }
+
+  const micText = popup.querySelector('.mic-text');
+  const micIcon = popup.querySelector('.mic-icon');
+  const volumeFill = popup.querySelector('#volume-fill');
+  const volumeText = popup.querySelector('#volume-text');
+
+  if (micText) {
+    micText.textContent = `Microphone: ${status}`;
+  }
+
+  if (micIcon) {
+    switch (status.toLowerCase()) {
+      case 'muted':
+        micIcon.textContent = '🔇';
+        break;
+      case 'listening':
+        micIcon.textContent = '🎤';
+        break;
+      case 'speaking':
+        micIcon.textContent = '🗣️';
+        break;
+      default:
+        micIcon.textContent = '🎤';
+    }
+  }
+
+  if (volumeFill && volumeText) {
+    const clampedVolume = Math.min(Math.max(volumeLevel, 0), 100);
+    volumeFill.style.width = `${clampedVolume}%`;
+    volumeText.textContent = `${Math.round(clampedVolume)}%`;
+    
+    // Log volume updates for debugging
+    if (clampedVolume > 10) {
+      console.log(`📊 [POPUP] Volume bar updated: ${clampedVolume.toFixed(1)}%`);
+    }
+  } else {
+    console.log("[POPUP] Volume elements not found:", { volumeFill: !!volumeFill, volumeText: !!volumeText });
+  }
+}
+
 // Export functions for use in content.js
 window.AIScrumPopup = {
-  showPopupCard
+  showPopupCard,
+  updateMicrophoneStatus
 };
