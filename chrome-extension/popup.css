@@ -1,0 +1,349 @@
+/* Popup styles for AI Scrum Chrome Extension */
+
+.ai-scrum-popup {
+  position: fixed;
+  width: 280px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: 'Roboto', sans-serif;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Ensure content doesn't overflow */
+  z-index: 1001; /* Above the trigger */
+  transition: all 0.3s ease-out; /* Smooth transition for all changes */
+}
+
+/* Minimized state */
+.ai-scrum-popup.minimized {
+  width: 120px;
+  height: 40px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #1a73e8, #1558b0);
+  color: white;
+  box-shadow: 0 4px 20px rgba(26, 115, 232, 0.3);
+}
+
+.ai-scrum-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #e8f0fe;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: grab; /* Indicate draggable area */
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  transition: all 0.3s ease-out;
+}
+
+/* Header in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-header {
+  background: transparent;
+  border-bottom: none;
+  border-radius: 20px;
+  padding: 0 8px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-scrum-popup-title {
+  font-weight: bold;
+  font-size: 16px;
+  transition: all 0.3s ease-out;
+}
+
+/* Title in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-title {
+  display: none;
+}
+
+.popup-controls button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  color: #5f6368;
+  transition: all 0.3s ease-out;
+}
+
+.popup-controls button:hover {
+  color: #202124;
+}
+
+/* Controls in minimized state */
+.ai-scrum-popup.minimized .popup-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-scrum-popup.minimized .popup-controls button {
+  color: white;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.ai-scrum-popup.minimized .popup-controls button:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.ai-scrum-close {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.ai-scrum-popup-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease-out;
+}
+
+/* Content in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-content {
+  display: none;
+}
+
+.ai-scrum-status-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease-out;
+}
+
+/* Status display in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-status-display {
+  display: none;
+}
+
+.ai-scrum-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ccc; /* Default gray */
+  transition: background-color 0.3s ease;
+}
+
+.ai-scrum-indicator.ready {
+  background-color: #4CAF50; /* Green */
+}
+
+.ai-scrum-indicator.active {
+  background-color: #f44336; /* Red */
+}
+
+.ai-scrum-indicator.connecting {
+  background-color: orange !important;
+  animation: pulse 1s ease-in-out infinite !important;
+}
+
+.ai-scrum-indicator.error {
+  background-color: red !important;
+}
+
+.ai-scrum-popup-buttons {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+  transition: all 0.3s ease-out;
+}
+
+/* Buttons in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-buttons {
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.ai-scrum-popup-btn {
+  flex: 1;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Buttons in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 20px;
+  min-width: 60px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.ai-scrum-popup.minimized .ai-scrum-popup-btn:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.ai-scrum-popup-btn.start-btn {
+  background-color: #1a73e8;
+  color: white;
+}
+
+.ai-scrum-popup-btn.start-btn:hover:not([disabled]) {
+  background-color: #1558b0;
+}
+
+/* Start button in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-btn.start-btn {
+  background: rgba(76, 175, 80, 0.8);
+  border-color: rgba(76, 175, 80, 0.6);
+}
+
+.ai-scrum-popup.minimized .ai-scrum-popup-btn.start-btn:hover:not([disabled]) {
+  background: rgba(76, 175, 80, 1);
+}
+
+.ai-scrum-popup-btn.stop-btn {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.ai-scrum-popup-btn.stop-btn:hover:not([disabled]) {
+  background-color: #c7c7c7;
+}
+
+/* Stop button in minimized state */
+.ai-scrum-popup.minimized .ai-scrum-popup-btn.stop-btn {
+  background: rgba(244, 67, 54, 0.8);
+  border-color: rgba(244, 67, 54, 0.6);
+}
+
+.ai-scrum-popup.minimized .ai-scrum-popup-btn.stop-btn:hover:not([disabled]) {
+  background: rgba(244, 67, 54, 1);
+}
+
+.ai-scrum-popup-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Minimized controls styles */
+.minimized-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.minimized-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.minimized-btn:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.minimized-btn.start-btn {
+  background: rgba(76, 175, 80, 0.8);
+  border-color: rgba(76, 175, 80, 0.6);
+}
+
+.minimized-btn.start-btn:hover:not([disabled]) {
+  background: rgba(76, 175, 80, 1);
+}
+
+.minimized-btn.stop-btn {
+  background: rgba(244, 67, 54, 0.8);
+  border-color: rgba(244, 67, 54, 0.6);
+}
+
+.minimized-btn.stop-btn:hover:not([disabled]) {
+  background: rgba(244, 67, 54, 1);
+}
+
+.minimized-btn.expand-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.minimized-btn.expand-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.minimized-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ai-scrum-project-info {
+  margin-top: 10px;
+}
+
+.ai-scrum-project-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #f8f9fa;
+}
+
+/* Styles for the floating trigger container */
+.ai-scrum-flex-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #1a73e8;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+}
+
+.ai-scrum-flex-container:hover {
+  transform: translateY(-2px);
+}
+
+.ai-scrum-icon {
+  font-size: 20px;
+  margin-right: 8px;
+}
+
+.ai-scrum-label {
+  font-size: 16px;
+  font-weight: bold;
+}

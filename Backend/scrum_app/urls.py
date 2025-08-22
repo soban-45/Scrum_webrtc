@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import EndConversationView, ProjectAPIView, EmployeeLastStandupView, webrtc_signal, DownloadExcelView
+from .views import EndConversationView, ProjectAPIView, EmployeeLastStandupView, webrtc_signal, DownloadExcelView,start_bot
 
 urlpatterns = [
     path("end/", EndConversationView.as_view()),
@@ -9,4 +9,5 @@ urlpatterns = [
          name='employee-last-standup'),
     path('webrtc-signal/', webrtc_signal, name='webrtc-signal'),
     path('download-excel/', DownloadExcelView.as_view(), name='download-excel'),
+    path('start-bot/', start_bot, name='start-bot'),
 ]
