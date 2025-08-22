@@ -96,6 +96,18 @@ function VoiceAssistant() {
   const [lastPlans, setLastPlans] = useState({});
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
+  // Add effect to log member index changes
+  useEffect(() => {
+    if (members.length > 0) {
+      console.log(
+        `👤 Current highlighted member: ${memberIndex + 1}/${members.length} - ${members[memberIndex]?.name || "Unknown"}`,
+      );
+    }
+  }, [memberIndex, members]);
 
   const fetchLastStandup = async (employeeId) => {
     if (!employeeId) {
@@ -182,12 +194,36 @@ function VoiceAssistant() {
     return map;
   };
 
-  useEffect(() => {
-    fetch(`${BACKEND_URL}/projects/`)
-      .then((res) => res.json())
-      .then((data) => setProjectList(data))
-      .catch((err) => console.error("Error fetching projects", err));
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    if (!userEmail.trim()) {
+      setEmailError("Please enter your email");
+      return;
+    }
 
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/projects/?email=${encodeURIComponent(userEmail.trim())}`,
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        setEmailError(errorData.error || "Failed to fetch projects");
+        return;
+      }
+
+      const data = await res.json();
+      setProjectList(data);
+      setEmailSubmitted(true);
+      setEmailError("");
+      console.log(`✅ Found ${data.length} projects for email: ${userEmail}`);
+    } catch (err) {
+      console.error("Error fetching projects for email:", err);
+      setEmailError("Failed to fetch projects. Please try again.");
+    }
+  };
+
+  useEffect(() => {
     // Initialize remote audio element
     remoteAudioRef.current = document.createElement("audio");
     remoteAudioRef.current.autoplay = true;
@@ -291,6 +327,7 @@ function VoiceAssistant() {
     setSelectedProject(projectId);
     setMemberIndex(0);
     setStandupResults([]);
+    setShowDownloadButton(false);
     try {
       const res = await fetch(
         `${BACKEND_URL}/projects/?project_id=${projectId}`,
@@ -310,6 +347,18 @@ function VoiceAssistant() {
     } catch (err) {
       console.error("Error fetching project details:", err);
     }
+  };
+
+  const handleResetEmail = () => {
+    setEmailSubmitted(false);
+    setUserEmail("");
+    setEmailError("");
+    setProjectList([]);
+    setSelectedProject(null);
+    setProjectDetails(null);
+    setMembers([]);
+    setLastPlans({});
+    setShowDownloadButton(false);
   };
 
   const buildDynamicSystemMessage = (
@@ -1014,9 +1063,21 @@ CRITICAL RULES:
           if (
             lower.includes("thanks") ||
             lower.includes("moving to the next member") ||
-            lower.includes("next person")
+            lower.includes("next person") ||
+            lower.includes("next member") ||
+            lower.includes("moving to") ||
+            lower.includes("let me move to") ||
+            lower.includes("next:") ||
+            (lower.includes("next") &&
+              (lower.includes("member") || lower.includes("person")))
           ) {
-            console.log("🔄 Detected member transition in AI response");
+            console.log(
+              "🔄 Detected member transition in AI response:",
+              finalTranscript,
+            );
+            console.log(
+              `Current member index: ${memberIndex}, Total members: ${members.length}`,
+            );
             handleMemberTransition();
           }
         }
@@ -1059,6 +1120,13 @@ CRITICAL RULES:
     const nextIndex = memberIndex + 1;
     if (nextIndex < members.length) {
       setMemberIndex(nextIndex);
+      console.log(
+        `🔄 Moved to member ${nextIndex + 1} of ${members.length}: ${members[nextIndex]?.name}`,
+      );
+    } else {
+      console.log(`✅ Completed all ${members.length} team members`);
+      // Optional: Reset to first member or keep at last member
+      // setMemberIndex(0); // Uncomment to cycle back to first member
     }
   };
 
@@ -1196,6 +1264,10 @@ CRITICAL RULES:
   };
 
   const startConversation = async () => {
+    if (!emailSubmitted) {
+      alert("Please enter your email first.");
+      return;
+    }
     if (!projectDetails || members.length === 0) {
       alert("Please select a project with members first.");
       return;
@@ -1476,51 +1548,122 @@ CRITICAL RULES:
             height: "100%",
           }}
         >
-          {/* Project Selection */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-              Select Project
-            </Typography>
-            <Box
-              sx={{
-                position: "relative",
-                "&:after": {
-                  content: '"▼"',
-                  position: "absolute",
-                  right: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  pointerEvents: "none",
-                  color: "primary.main",
-                },
-              }}
-            >
-              <select
-                onChange={handleProjectSelect}
-                value={selectedProject || ""}
-                style={{
-                  width: "100%",
-                  padding: "8px 32px 8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #6c5ce7",
-                  backgroundColor: "rgba(255, 255, 255, 0.8)",
-                  appearance: "none",
-                  outline: "none",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              >
-                <option value="" disabled>
-                  Select a project
-                </option>
-                {projectList.map((project) => (
-                  <option key={project.project_id} value={project.project_id}>
-                    {project.project_name}
-                  </option>
-                ))}
-              </select>
+          {/* Email Input Section */}
+          {!emailSubmitted ? (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                Enter Your Email
+              </Typography>
+              <form onSubmit={handleEmailSubmit}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <input
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="your.email@company.com"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: `1px solid ${emailError ? "#f44336" : "#6c5ce7"}`,
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      outline: "none",
+                      fontSize: "14px",
+                    }}
+                  />
+                  {emailError && (
+                    <Typography variant="caption" sx={{ color: "error.main" }}>
+                      {emailError}
+                    </Typography>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="small"
+                    sx={{
+                      bgcolor: "primary.main",
+                      "&:hover": { bgcolor: "primary.dark" },
+                    }}
+                  >
+                    Get My Projects
+                  </Button>
+                </Box>
+              </form>
             </Box>
-          </Box>
+          ) : (
+            <>
+              {/* Email Display and Reset */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Your Email
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    label={userEmail}
+                    variant="outlined"
+                    size="small"
+                    sx={{ bgcolor: "rgba(108, 92, 231, 0.1)" }}
+                  />
+                  <Button
+                    onClick={handleResetEmail}
+                    size="small"
+                    variant="text"
+                    sx={{ fontSize: "12px", textTransform: "none" }}
+                  >
+                    Change
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Project Selection */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Select Project ({projectList.length} available)
+                </Typography>
+                <Box
+                  sx={{
+                    position: "relative",
+                    "&:after": {
+                      content: '"▼"',
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                      color: "primary.main",
+                    },
+                  }}
+                >
+                  <select
+                    onChange={handleProjectSelect}
+                    value={selectedProject || ""}
+                    style={{
+                      width: "100%",
+                      padding: "8px 32px 8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #6c5ce7",
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      appearance: "none",
+                      outline: "none",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="" disabled>
+                      Select a project
+                    </option>
+                    {projectList.map((project) => (
+                      <option
+                        key={project.project_id}
+                        value={project.project_id}
+                      >
+                        {project.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </Box>
+              </Box>
+            </>
+          )}
 
           {/* Team Members Section */}
           <Box
@@ -1544,7 +1687,26 @@ CRITICAL RULES:
               <PeopleIcon fontSize="small" /> Team Members
             </Typography>
 
-            {projectDetails ? (
+            {!emailSubmitted ? (
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  color: "text.secondary",
+                }}
+              >
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Enter your email first
+                </Typography>
+                <Typography variant="body2">
+                  We'll show only projects assigned to you
+                </Typography>
+              </Box>
+            ) : projectDetails ? (
               <Box
                 sx={{
                   flexGrow: 1,
