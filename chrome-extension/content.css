@@ -2,7 +2,8 @@
 
 .ai-scrum-popup {
   position: fixed;
-  width: 280px;
+  width: 320px;
+  max-height: 600px;
   background-color: #fff;
   border: 1px solid #ccc;
   border-radius: 8px;
@@ -183,35 +184,6 @@
 
 .mic-text {
   font-weight: 500;
-}
-
-.volume-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.volume-bar {
-  flex: 1;
-  height: 6px;
-  background-color: #e0e0e0;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.volume-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4CAF50, #8BC34A);
-  width: 0%;
-  transition: width 0.1s ease;
-  border-radius: 3px;
-}
-
-.volume-text {
-  font-size: 10px;
-  color: #666;
-  min-width: 25px;
-  text-align: right;
 }
 
 /* Microphone status in minimized state */
@@ -406,4 +378,278 @@
 .ai-scrum-label {
   font-size: 16px;
   font-weight: bold;
+}
+
+/* Email Section Styles */
+.email-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.email-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #6c5ce7;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.email-input.error {
+  border-color: #f44336;
+}
+
+.email-input:focus {
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.1);
+}
+
+.email-submit-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.email-submit-btn:hover {
+  background-color: #5d4ed8;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.email-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.email-chip {
+  background-color: rgba(108, 92, 231, 0.1);
+  color: #6c5ce7;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-email-btn {
+  background: none;
+  border: 1px solid #6c5ce7;
+  color: #6c5ce7;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.change-email-btn:hover {
+  background-color: #6c5ce7;
+  color: white;
+}
+
+/* Project Section Styles */
+.project-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.project-section.disabled {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+}
+
+.project-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #6c5ce7;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.project-select:focus {
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.1);
+}
+
+.disabled-message {
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.loading-message {
+  color: #6c5ce7;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Team Members Section Styles */
+.team-members-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.team-members-section.disabled {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+}
+
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background-color: white;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.member-item.current {
+  background-color: #e3f2fd;
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.1);
+}
+
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  background-color: #6c5ce7;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.member-item.current .member-avatar {
+  background-color: #5d4ed8;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333;
+}
+
+.member-role {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Download Button Styles */
+.ai-scrum-popup-btn.download-btn {
+  background-color: #4caf50;
+  color: white;
+}
+
+.ai-scrum-popup-btn.download-btn:hover:not([disabled]) {
+  background-color: #45a049;
+}
+
+.minimized-btn.download-btn {
+  background: rgba(76, 175, 80, 0.8);
+  border-color: rgba(76, 175, 80, 0.6);
+}
+
+.minimized-btn.download-btn:hover:not([disabled]) {
+  background: rgba(76, 175, 80, 1);
+}
+
+/* Scrollbar Styles */
+.team-members-section::-webkit-scrollbar {
+  width: 4px;
+}
+
+.team-members-section::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 2px;
+}
+
+.team-members-section::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+.team-members-section::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Popup content with better scrolling */
+.ai-scrum-popup-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease-out;
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.ai-scrum-popup-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ai-scrum-popup-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 2px;
+}
+
+.ai-scrum-popup-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+.ai-scrum-popup-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
