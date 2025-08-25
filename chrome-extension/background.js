@@ -98,22 +98,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         return response.blob();
       })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        chrome.downloads.download({
-          url: url,
-          filename: `standup_${message.projectId}.xlsx`,
-          saveAs: true
-        }, (downloadId) => {
-          if (chrome.runtime.lastError) {
-            console.error("[AI SCRUM] Download error ❌:", chrome.runtime.lastError);
-            sendResponse({ success: false, error: chrome.runtime.lastError.message });
-          } else {
-            console.log("[AI SCRUM] Excel download started ✅");
-            sendResponse({ success: true, downloadId });
-          }
-          URL.revokeObjectURL(url);
-        });
+      .then(async blob => {
+        try {
+          // Convert blob to array buffer then to base64 data URL
+          const arrayBuffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+          const base64 = btoa(binary);
+          const dataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+          
+          chrome.downloads.download({
+            url: dataUrl,
+            filename: `standup_${message.projectId}.xlsx`,
+            saveAs: true
+          }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+              console.error("[AI SCRUM] Download error ❌:", chrome.runtime.lastError);
+              sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              console.log("[AI SCRUM] Excel download started ✅");
+              sendResponse({ success: true, downloadId });
+            }
+          });
+        } catch (error) {
+          console.error("[AI SCRUM] Error processing blob ❌:", error);
+          sendResponse({ success: false, error: error.message });
+        }
       })
       .catch(error => {
         console.error("[AI SCRUM] Download Excel error ❌:", error);

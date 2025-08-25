@@ -29,6 +29,7 @@ class EndConversationView(APIView):
     def post(self, request):
         try:
             conversation = request.data.get('conversation', [])
+            print(conversation,"<--- conversation data")
             project_id = request.data.get('project_id')
 
             if not project_id:

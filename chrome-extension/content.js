@@ -75,8 +75,8 @@ function createPopupHTML() {
       </div>
       <!-- Minimized state buttons (hidden by default) -->
       <div class="minimized-controls" style="display: none;">
-        <button class="minimized-btn start-btn" id="minimized-start-btn" title="Start Session">▶</button>
-        <button class="minimized-btn stop-btn" id="minimized-stop-btn" title="Stop Session" disabled>⏹</button>
+        <button class="minimized-btn start-btn" id="minimized-start-btn" title="Start Session" ${!canStartSession() || isConnected ? 'disabled' : ''}>▶</button>
+        <button class="minimized-btn stop-btn" id="minimized-stop-btn" title="Stop Session" ${!isConnected ? 'disabled' : ''}>⏹</button>
         <button class="minimized-btn expand-btn" id="expand-btn" title="Expand">□</button>
         ${popupState.showDownloadButton ? `<button class="minimized-btn download-btn" id="minimized-download-btn" title="Download Excel">💾</button>` : ''}
       </div>
@@ -107,10 +107,10 @@ function createPopupHTML() {
       
       <!-- Action Buttons -->
       <div class="ai-scrum-popup-buttons">
-        <button class="ai-scrum-popup-btn start-btn" id="start-session-btn" ${!canStartSession() ? 'disabled' : ''}>
+        <button class="ai-scrum-popup-btn start-btn" id="start-session-btn" ${!canStartSession() || isConnected ? 'disabled' : ''}>
           <span>▶</span> Start Session
         </button>
-        <button class="ai-scrum-popup-btn stop-btn" id="stop-session-btn" disabled>
+        <button class="ai-scrum-popup-btn stop-btn" id="stop-session-btn" ${!isConnected ? 'disabled' : ''}>
           <span>⏹</span> Stop Session
         </button>
         ${popupState.showDownloadButton ? `
@@ -320,20 +320,23 @@ function buildDynamicSystemMessage(project, membersList, lastPlansMap = {}) {
     membersWithPreviousData: Object.values(lastPlansMap).filter(Boolean).length,
   });
 
-  return `You are a friendly, warm, and professional standup facilitator for "${project.project_name}". Your goal is to create a comfortable, supportive environment while gathering standup updates.
+  return `You are a friendly, warm, and enthusiastic standup facilitator for "${project.project_name}" - think of yourself as an Alexa-like assistant with lots of personality! Your goal is to create a comfortable, supportive environment while gathering standup updates.
 
 Team members: ${memberNames}
 
 Previous standup context:
 ${perMemberNotes}
 
-PERSONALITY & TONE:
-- Be warm, friendly, and encouraging
-- Use casual, conversational language (like "Hey there!", "That's awesome!", "Cool!")
-- Show genuine interest in their work
-- Be supportive when they mention challenges
-- Keep the mood light and positive
-- Avoid being too formal or robotic
+PERSONALITY & TONE - BE FRIENDLY AND NATURAL:
+- Be warm, friendly, and genuinely interested in their work
+- Use casual, conversational language that sounds natural
+- Occasionally use expressive reactions like "Oh!","Aww","Huhh Hmm","That's great!", "Nice!", but don't overdo it
+- Include natural conversational fillers like "So...", "Well...", "Let's see..."
+- Show genuine interest: "That sounds interesting!", "I see what you mean!"
+- Be supportive when they mention challenges: "That does sound tricky!"
+- Celebrate their successes naturally: "That's great work!", "Well done!"
+- Keep the mood light, positive, and professional but friendly
+- Sound like a helpful colleague who's genuinely interested in the project
 
 CONVERSATION FLOW RULES:
 1. START IMMEDIATELY with a warm greeting to the whole team
@@ -347,36 +350,38 @@ CONVERSATION FLOW RULES:
 
 HANDLING PREVIOUS STANDUP DATA - CRITICAL INSTRUCTIONS:
 - ALWAYS use the EXACT text from the previous standup data
-- If they have previous data, reference it directly: "Hey [Name]! I see you were planning to work on '[EXACT previous plan text]' today - how did that go?"
-- If they had blockers, ask: "I also remember you mentioned '[EXACT previous blocker text]' - did you resolve that?"
+- If they have previous data, reference it naturally: "Hi [Name]! I see you were planning to work on '[EXACT previous plan text]' yesterday - how did that go? What were you able to complete?"
+- If they had blockers, ask with concern: "I also remember you mentioned '[EXACT previous blocker text]' - did you manage to resolve that?"
 - If no previous data: "Hi [Name]! Let's start with what you accomplished yesterday"
-- For members with no previous data, ALWAYS ask these questions in order:
+- For members with no previous data, ALWAYS ask these questions clearly:
   1. "What did you accomplish yesterday?"
-  2. "What are you planning to work on today?"
+  2. "That sounds good! What are you planning to work on today?"
   3. "Did you have any blockers yesterday that might still be affecting you?"
-  4. "Do you have any current blockers for today's work?"
+  4. "And do you have any current blockers for today's work?"
 - NEVER make up or assume tasks - only use the exact text provided
-- Be encouraging: "Great job on that!" or "Nice progress!"
+- Be encouraging naturally: "Good work on that!", "Nice progress!", "That sounds challenging but you handled it well!"
 
 HANDLING OFF-TOPIC RESPONSES:
 - If someone talks about unrelated topics, gently redirect: "That's interesting! But let's focus on your work updates for the standup. So about [question]..."
 - Stay friendly while redirecting: "I appreciate you sharing that! Now, back to your standup - can you tell me about [specific question]?"
-- Don't be harsh, just guide them back smoothly
+- Don't be harsh, just guide them back smoothly with natural transitions
 
 EXAMPLE OPENING:
-"Hello! Let's begin your standup update, ${membersList[0]?.name}! ${lastPlansMap[membersList[0]?.employee_id]?.["Plan Today"] ? `Yesterday you planned to ${lastPlansMap[membersList[0]?.employee_id]["Plan Today"].toLowerCase()}. How did that go? What were you able to complete?` : "What did you work on yesterday?"}"
+"Hello everyone! I'm excited to be here for your standup today. Let's begin, ${membersList[0]?.name}! ${lastPlansMap[membersList[0]?.employee_id]?.["Plan Today"] ? `I see yesterday you planned to ${lastPlansMap[membersList[0]?.employee_id]["Plan Today"].toLowerCase()}. How did that go? What were you able to complete?` : "What did you work on yesterday?"}"
 
 MEMBER TRANSITIONS:
-When moving to next member, say: "Thanks [current name]. Moving to the next member. Next: [next name]. [Previous task reference if available] [next name], did you complete those items yesterday?"
+When moving to next member, say naturally: "Thanks [current name]! Great to hear about your progress. Now let me move to the next member. [next name], hello! [Previous task reference if available] So [next name], did you complete those items yesterday?"
 
 CRITICAL RULES: 
 - Complete ALL questions for one member before moving to next
 - ONLY use exact text from previous standup data - NEVER hallucinate or make up tasks
-- Use the EXACT conversational style: "Yesterday you planned to [task] - how did that go?"
-- Keep it natural and friendly like the original assistant
-- Don't be rush - let them fully answer each question
+- Use natural conversational style: "Yesterday you planned to [task] - how did that go?"
+- Keep it natural, friendly, and professional
+- Don't rush - let them fully answer each question and respond appropriately
 - Start the conversation immediately upon session start
-- Always reference their previous plan directly when available`;
+- Always reference their previous plan directly when available
+- Show genuine interest in their work and challenges
+- Use natural speech patterns to sound conversational and human`;
 }
 
 // Audio processing and monitoring
@@ -723,10 +728,13 @@ function setupPopupEventListeners(popup) {
       return;
     }
 
-    console.log('[Content] Start clicked: establishing WebRTC connection with project context');
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
+    if (isConnected) {
+      alert("Session is already active. Please stop the current session first.");
+      return;
+    }
 
+    console.log('[Content] Start clicked: establishing WebRTC connection with project context');
+    
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
     statusDisplay.textContent = 'Status: Connecting...';
@@ -768,6 +776,9 @@ function setupPopupEventListeners(popup) {
             statusDisplay.textContent = 'Status: Active';
             indicator.className = 'ai-scrum-indicator active';
             console.log('[Content] AI speaking started with project context');
+            
+            // Update button states after successful connection
+            refreshPopup();
           } else if (attempts < maxAttempts) {
             attempts++;
             // Check again in 500ms
@@ -776,8 +787,10 @@ function setupPopupEventListeners(popup) {
             console.error('[Content] Data channel not ready after maximum attempts');
             statusDisplay.textContent = 'Status: Connection Timeout';
             indicator.className = 'ai-scrum-indicator error';
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
+            
+            // Reset connection state on failure
+            isConnected = false;
+            refreshPopup();
           }
         };
         
@@ -790,16 +803,21 @@ function setupPopupEventListeners(popup) {
         const indicator = popup.querySelector('.ai-scrum-indicator');
         statusDisplay.textContent = 'Status: Connection Failed';
         indicator.className = 'ai-scrum-indicator error';
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
+        
+        // Reset connection state on failure
+        isConnected = false;
+        refreshPopup();
       });
   });
 
   // Stop session
   stopBtn.addEventListener('click', async () => {
+    if (!isConnected) {
+      alert("No active session to stop.");
+      return;
+    }
+
     console.log('[Content] Stopping AI session');
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
 
     // Update status
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
@@ -807,25 +825,35 @@ function setupPopupEventListeners(popup) {
     statusDisplay.textContent = 'Status: Saving...';
     indicator.className = 'ai-scrum-indicator connecting';
 
-    // Send end conversation to backend to save standup data
+    // Send end conversation to backend to save standup data (like VoiceAssistant.jsx)
     try {
-      if (popupState.selectedProject) {
+      if (popupState.selectedProject && conversation.length > 0) {
+        console.log("💾 Saving conversation data to database...");
+        console.log(`📊 Conversation has ${conversation.length} messages`);
+        
         const response = await sendMessageToBackground('endConversation', {
           projectId: popupState.selectedProject,
           conversation: conversation.filter((msg) => msg.role !== "system")
         });
 
         if (response.success) {
-          console.log("✅ Standup data saved successfully");
+          console.log("✅ Standup data saved successfully to database");
           popupState.showDownloadButton = true;
           statusDisplay.textContent = 'Status: Complete';
           indicator.className = 'ai-scrum-indicator ready';
+        } else {
+          throw new Error(response.error || 'Failed to save conversation');
         }
+      } else {
+        console.warn("⚠️ No conversation data to save");
+        statusDisplay.textContent = 'Status: No Data';
+        indicator.className = 'ai-scrum-indicator ready';
       }
     } catch (error) {
       console.error("❌ Error saving standup data:", error);
       statusDisplay.textContent = 'Status: Save Failed';
       indicator.className = 'ai-scrum-indicator error';
+      alert("Failed to save standup data. Please try again.");
     }
 
     // Stop audio monitoring and cleanup
@@ -860,12 +888,37 @@ function setupPopupEventListeners(popup) {
       audioContext = null;
     }
     
-    // Reset state
+    // Reset connection state
     dataChannel = null;
     isConnected = false;
+    
+    // Log conversation summary before clearing
+    if (conversation.length > 0) {
+      console.log("📋 =================================");
+      console.log("📊 CONVERSATION SUMMARY (SESSION END):");
+      console.log(`📈 Total messages: ${conversation.length}`);
+      console.log(`👤 User messages: ${conversation.filter(msg => msg.role === 'user').length}`);
+      console.log(`🤖 Assistant messages: ${conversation.filter(msg => msg.role === 'assistant').length}`);
+      console.log("📋 Full conversation:");
+      conversation.forEach((msg, index) => {
+        const icon = msg.role === 'user' ? '👤' : '🤖';
+        console.log(`  ${index + 1}. ${icon} ${msg.role.toUpperCase()}: "${msg.content}"`);
+      });
+      console.log("📋 =================================");
+    }
+    
+    // Clear conversation after saving
     conversation = [];
 
-    // Refresh popup to show download button if available
+    // Update final status and refresh popup to show new button states
+    const finalStatusDisplay = popup.querySelector('.ai-scrum-status-display span');
+    const finalIndicator = popup.querySelector('.ai-scrum-indicator');
+    if (popupState.showDownloadButton) {
+      finalStatusDisplay.textContent = 'Status: Ready';
+      finalIndicator.className = 'ai-scrum-indicator ready';
+    }
+    
+    // Refresh popup to show download button and correct button states
     refreshPopup();
   });
 
@@ -1099,6 +1152,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Reset state
     dataChannel = null;
     isConnected = false;
+    
+    // Log conversation summary before clearing
+    if (conversation.length > 0) {
+      console.log("📋 =================================");
+      console.log("📊 CONVERSATION SUMMARY (STOP BOT):");
+      console.log(`📈 Total messages: ${conversation.length}`);
+      console.log(`👤 User messages: ${conversation.filter(msg => msg.role === 'user').length}`);
+      console.log(`🤖 Assistant messages: ${conversation.filter(msg => msg.role === 'assistant').length}`);
+      console.log("📋 Full conversation:");
+      conversation.forEach((msg, index) => {
+        const icon = msg.role === 'user' ? '👤' : '🤖';
+        console.log(`  ${index + 1}. ${icon} ${msg.role.toUpperCase()}: "${msg.content}"`);
+      });
+      console.log("📋 =================================");
+    }
+    
     conversation = [];
     projectContext = {
       projectDetails: null,
@@ -1337,12 +1406,15 @@ function sendData(data) {
 
 // Start AI conversation with welcome message
 function startAIConversation() {
-  console.log("[Content] 🚀 startAIConversation called");
+  console.log("🚀 =================================");
+  console.log("🚀 STARTING NEW AI CONVERSATION");
   console.log("[Content] 📋 Project context:", projectContext);
   console.log("[Content] 🔗 DataChannel state:", dataChannel?.readyState);
   console.log("[Content] 🔌 Is connected:", isConnected);
+  console.log(`📊 Current conversation length: ${conversation.length} messages`);
+  console.log("🚀 =================================");
   
-  let welcomeInstructions = "Hello! I'm your AI Scrum Master. I'm connected and ready to help facilitate your standup meeting. I'll guide you through the standup process. Please tell me when you're ready to begin.";
+  let welcomeInstructions = "Hello everyone! I'm your AI Scrum Master and I'm here to help facilitate your standup meeting today. I'm looking forward to hearing about the work you've been doing. Are you ready to begin?";
   
   // If we have project context, start with personalized greeting
   if (projectContext.projectDetails && projectContext.members.length > 0) {
@@ -1350,10 +1422,10 @@ function startAIConversation() {
     const lastForFirst = projectContext.lastPlans[firstMember?.employee_id];
 
     const openingPrompt = lastForFirst?.["Plan Today"]
-      ? `Hello! Let's begin your standup update, ${firstMember.name}! Yesterday you planned to ${lastForFirst["Plan Today"].toLowerCase()}. How did that go? What were you able to complete?`
-      : `Hello! Let's begin your standup update, ${firstMember.name}! What did you work on yesterday?`;
+      ? `Hello everyone! I'm excited to be here for your standup today. Let's begin, ${firstMember.name}! I see yesterday you planned to ${lastForFirst["Plan Today"].toLowerCase()}. How did that go? What were you able to complete?`
+      : `Hello everyone! I'm excited to be here for your standup today. Let's begin, ${firstMember.name}! What did you work on yesterday?`;
 
-    welcomeInstructions = `Say exactly: "${openingPrompt}" - use this exact greeting and question format.`;
+    welcomeInstructions = `Say exactly: "${openingPrompt}" - use this natural and friendly greeting format.`;
     console.log("🚀 Starting AI conversation with personalized greeting for", firstMember.name);
   } else {
     console.log("🚀 Starting AI conversation with generic greeting");
@@ -1554,6 +1626,14 @@ function handleServerEvent(event) {
         // Add to conversation history
         const userMsg = { role: "user", content: event.transcript.trim() };
         conversation.push(userMsg);
+        
+        // Console log for conversation tracking
+        console.log("🗣️ =================================");
+        console.log(`👤 USER TURN #${conversation.filter(msg => msg.role === 'user').length}:`);
+        console.log(`📝 Message: "${userMsg.content}"`);
+        console.log(`🕐 Time: ${new Date().toLocaleTimeString()}`);
+        console.log(`📊 Total conversation length: ${conversation.length} messages`);
+        console.log("🗣️ =================================");
       }
       return;
     }
@@ -1578,10 +1658,19 @@ function handleServerEvent(event) {
         const assistantMsg = { role: "assistant", content: finalTranscript };
         conversation.push(assistantMsg);
         
+        // Console log for conversation tracking
+        console.log("🤖 =================================");
+        console.log(`🎙️ ASSISTANT TURN #${conversation.filter(msg => msg.role === 'assistant').length}:`);
+        console.log(`📝 Message: "${assistantMsg.content}"`);
+        console.log(`🕐 Time: ${new Date().toLocaleTimeString()}`);
+        console.log(`📊 Total conversation length: ${conversation.length} messages`);
+        console.log("🤖 =================================");
+        
         // Check for member transition keywords
         const lower = finalTranscript.toLowerCase();
         if (
           lower.includes("thanks") ||
+          lower.includes("great to hear about your progress") ||
           lower.includes("moving to the next member") ||
           lower.includes("next person") ||
           lower.includes("next member") ||
