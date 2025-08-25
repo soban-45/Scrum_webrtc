@@ -277,6 +277,7 @@ function refreshPopup() {
   const popup = document.getElementById('ai-scrum-popup-card');
   if (popup) {
     popup.innerHTML = createPopupHTML();
+    makeDraggable(popup);  // Re-enable drag functionality after HTML refresh
     setupPopupEventListeners(popup);
   }
 }
