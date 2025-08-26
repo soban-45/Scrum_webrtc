@@ -653,3 +653,48 @@
 .ai-scrum-popup-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+/* Google Meet Mute Status Display */
+.meet-mute-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e8eaed;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.meet-mute-status .meet-status-icon {
+  font-size: 14px;
+}
+
+.meet-mute-status .meet-status-text {
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+/* Status colors */
+.meet-mute-status.ready .meet-status-text {
+  color: #137333;
+}
+
+.meet-mute-status.muted .meet-status-text {
+  color: #d93025;
+}
+
+/* Microphone Instructions */
+.mic-instructions {
+  margin-top: 8px;
+  text-align: center;
+  color: #5f6368;
+  font-style: italic;
+}
+
+.mic-instructions small {
+  font-size: 11px;
+  opacity: 0.8;
+}
