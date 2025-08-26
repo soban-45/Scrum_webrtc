@@ -88,17 +88,26 @@ function createPopupHTML() {
       <!-- Project Section -->
       ${createProjectSection()}
       
-      <!-- Status Section -->
-      <div class="ai-scrum-status-display">
+      <!-- Status Section (Hidden but functional) -->
+      <!-- These elements are hidden from the UI but still functional for internal status tracking -->
+      <div class="ai-scrum-status-display" style="display: none;">
         <span>Status: Ready</span>
         <div class="ai-scrum-indicator ready"></div>
       </div>
       
-      <!-- Microphone Status -->
-      <div class="ai-scrum-microphone-status">
+      <!-- Microphone Status (Hidden but functional) -->
+      <!-- These elements are hidden from the UI but still functional for internal microphone status tracking -->
+      <div class="ai-scrum-microphone-status" style="display: none;">
         <div class="mic-status">
           <span class="mic-icon">🎤</span>
           <span class="mic-text">Microphone: Ready</span>
+        </div>
+        <div class="meet-mute-status" id="meet-mute-status">
+          <span class="meet-status-icon">🔒</span>
+          <span class="meet-status-text">Google Meet: Ready</span>
+        </div>
+        <div class="mic-instructions">
+          <small>💡 Unmute in Google Meet to use AI Scrum features</small>
         </div>
       </div>
       
@@ -419,6 +428,12 @@ function createRemoteAudioElement() {
 // Enhanced microphone setup with advanced noise suppression
 async function setupMicrophone() {
   try {
+    // Check if Google Meet is muted before accessing microphone
+    if (isGoogleMeetMuted()) {
+      console.log("🎤 Google Meet is muted - not accessing microphone");
+      throw new Error("Google Meet is muted. Please unmute to use AI Scrum.");
+    }
+
     // Enhanced microphone settings optimized for headphones and noise suppression
     userStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -506,6 +521,9 @@ async function setupMicrophone() {
     // Start periodic popup updates to ensure UI stays responsive
     startPeriodicPopupUpdates();
 
+    // Start monitoring Google Meet mute state
+    startMuteMonitoring();
+
     return true;
   } catch (error) {
     throw error;
@@ -557,6 +575,161 @@ function monitorAudioLevels() {
   };
 
   checkAudioLevel();
+}
+
+// Enhanced mute state detection
+function isGoogleMeetMuted() {
+  // Method 1: Check mute button state
+  const muteButton = document.querySelector('[aria-label*="mute"], [aria-label*="Mute"]');
+  if (muteButton) {
+    const ariaLabel = muteButton.getAttribute('aria-label') || '';
+    if (ariaLabel.includes('unmute') || ariaLabel.includes('Turn on microphone')) {
+      return true; // Muted
+    }
+  }
+  
+  // Method 2: Check for muted icon classes
+  const mutedSelectors = [
+    '.muted-icon',
+    '.mic-off',
+    '[data-muted="true"]',
+    '[data-is-muted="true"]',
+    '.muted',
+    '.mic-disabled'
+  ];
+  
+  for (const selector of mutedSelectors) {
+    if (document.querySelector(selector)) {
+      return true;
+    }
+  }
+  
+  // Method 3: Check button text content
+  const muteTexts = ['unmute', 'Turn on microphone', 'Enable microphone'];
+  const allButtons = document.querySelectorAll('button');
+  
+  for (const button of allButtons) {
+    const buttonText = button.textContent?.toLowerCase() || '';
+    if (muteTexts.some(text => buttonText.includes(text))) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Function to stop microphone access when Meet is muted
+function stopMicrophoneAccess() {
+  if (userAudioTrack && userAudioTrack.readyState === "live") {
+    userAudioTrack.enabled = false;
+    console.log("🎤 Microphone access stopped due to Google Meet mute");
+    
+    // Update UI to show microphone is disabled
+    updatePopupMicrophoneStatus('Disabled (Meet Muted)');
+  }
+}
+
+// Function to resume microphone access when Meet is unmuted
+function resumeMicrophoneAccess() {
+  if (userAudioTrack && userAudioTrack.readyState === "live") {
+    userAudioTrack.enabled = true;
+    console.log("🎤 Microphone access resumed");
+    
+    // Update UI to show microphone is ready
+    updatePopupMicrophoneStatus('Ready');
+  }
+}
+
+// Add a mute state monitor
+function startMuteStateMonitoring() {
+  // Monitor for changes in Google Meet's mute state
+  const observer = new MutationObserver(() => {
+    if (isGoogleMeetMuted() && userAudioTrack && userAudioTrack.enabled) {
+      console.log("🎤 Google Meet muted - stopping microphone access");
+      stopMicrophoneAccess();
+    } else if (!isGoogleMeetMuted() && userAudioTrack && !userAudioTrack.enabled && isConnected) {
+      console.log("🎤 Google Meet unmuted - resuming microphone access");
+      resumeMicrophoneAccess();
+    }
+  });
+
+  // Observe the entire document for changes
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['aria-label', 'data-is-muted', 'class']
+  });
+
+  return observer;
+}
+
+// Start mute monitoring when session begins
+function startMuteMonitoring() {
+  const muteObserver = startMuteStateMonitoring();
+  // Store observer reference for cleanup
+  window.aiScrumMuteObserver = muteObserver;
+}
+
+// Clean up observer when stopping
+function stopMuteMonitoring() {
+  if (window.aiScrumMuteObserver) {
+    window.aiScrumMuteObserver.disconnect();
+    window.aiScrumMuteObserver = null;
+  }
+}
+
+// Update the updatePopupMicrophoneStatus function to handle new statuses
+function updatePopupMicrophoneStatus(status) {
+  const popup = document.getElementById('ai-scrum-popup-card');
+  if (!popup) return;
+
+  const micText = popup.querySelector('.mic-text');
+  const micIcon = popup.querySelector('.mic-icon');
+
+  if (micText) {
+    micText.textContent = `Microphone: ${status}`;
+  }
+
+  if (micIcon) {
+    switch (status.toLowerCase()) {
+      case 'disabled (meet muted)':
+        micIcon.textContent = '🚫';
+        break;
+      case 'muted':
+        micIcon.textContent = '🔇';
+        break;
+      case 'listening':
+        micIcon.textContent = '🎤';
+        break;
+      case 'ready':
+        micIcon.textContent = '🎤';
+        break;
+      default:
+        micIcon.textContent = '🎤';
+    }
+  }
+}
+
+// Function to update Google Meet mute status display
+function updateMeetMuteStatus() {
+  const popup = document.getElementById('ai-scrum-popup-card');
+  if (!popup) return;
+
+  const meetStatusIcon = popup.querySelector('.meet-status-icon');
+  const meetStatusText = popup.querySelector('.meet-status-text');
+
+  if (meetStatusIcon && meetStatusText) {
+    if (isGoogleMeetMuted()) {
+      meetStatusIcon.textContent = '🔇';
+      meetStatusText.textContent = 'Google Meet: Muted';
+      meetStatusText.style.color = '#d93025'; // Red color for muted
+    } else {
+      meetStatusIcon.textContent = '🎤';
+      meetStatusText.textContent = 'Google Meet: Ready';
+      meetStatusText.style.color = '#137333'; // Green color for ready
+    }
+  }
 }
 
 // Setup popup event listeners
@@ -734,12 +907,18 @@ function setupPopupEventListeners(popup) {
       return;
     }
 
+    // Check if Google Meet is muted before starting
+    if (isGoogleMeetMuted()) {
+      alert("🎤 Google Meet is currently muted. Please unmute your microphone in Google Meet first, then try starting the session again.");
+      return;
+    }
+
     console.log('[Content] Start clicked: establishing WebRTC connection with project context');
     
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
-    statusDisplay.textContent = 'Status: Connecting...';
-    indicator.className = 'ai-scrum-indicator connecting';
+    if (statusDisplay) statusDisplay.textContent = 'Status: Connecting...';
+    if (indicator) indicator.className = 'ai-scrum-indicator connecting';
 
     // Reset member index when starting new session
     popupState.memberIndex = 0;
@@ -759,8 +938,8 @@ function setupPopupEventListeners(popup) {
       .then(() => {
         const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
         const indicator = popup.querySelector('.ai-scrum-indicator');
-        statusDisplay.textContent = 'Status: Connected';
-        indicator.className = 'ai-scrum-indicator ready';
+        if (statusDisplay) statusDisplay.textContent = 'Status: Connected';
+        if (indicator) indicator.className = 'ai-scrum-indicator ready';
         
         // Wait for data channel to be ready before starting AI conversation
         let attempts = 0;
@@ -774,8 +953,8 @@ function setupPopupEventListeners(popup) {
             // Now trigger AI to speak with project context
             console.log('[Content] Data channel ready, starting AI conversation');
             startAIConversation();
-            statusDisplay.textContent = 'Status: Active';
-            indicator.className = 'ai-scrum-indicator active';
+            if (statusDisplay) statusDisplay.textContent = 'Status: Active';
+            if (indicator) indicator.className = 'ai-scrum-indicator active';
             console.log('[Content] AI speaking started with project context');
             
             // Update button states after successful connection
@@ -786,8 +965,8 @@ function setupPopupEventListeners(popup) {
             setTimeout(checkDataChannelReady, 500);
           } else {
             console.error('[Content] Data channel not ready after maximum attempts');
-            statusDisplay.textContent = 'Status: Connection Timeout';
-            indicator.className = 'ai-scrum-indicator error';
+            if (statusDisplay) statusDisplay.textContent = 'Status: Connection Timeout';
+            if (indicator) indicator.className = 'ai-scrum-indicator error';
             
             // Reset connection state on failure
             isConnected = false;
@@ -802,8 +981,8 @@ function setupPopupEventListeners(popup) {
         console.error('[Content] WebRTC connection failed:', error);
         const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
         const indicator = popup.querySelector('.ai-scrum-indicator');
-        statusDisplay.textContent = 'Status: Connection Failed';
-        indicator.className = 'ai-scrum-indicator error';
+        if (statusDisplay) statusDisplay.textContent = 'Status: Connection Failed';
+        if (indicator) indicator.className = 'ai-scrum-indicator error';
         
         // Reset connection state on failure
         isConnected = false;
@@ -823,8 +1002,8 @@ function setupPopupEventListeners(popup) {
     // Update status
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
-    statusDisplay.textContent = 'Status: Saving...';
-    indicator.className = 'ai-scrum-indicator connecting';
+    if (statusDisplay) statusDisplay.textContent = 'Status: Saving...';
+    if (indicator) indicator.className = 'ai-scrum-indicator connecting';
 
     // Send end conversation to backend to save standup data (like VoiceAssistant.jsx)
     try {
@@ -840,25 +1019,28 @@ function setupPopupEventListeners(popup) {
         if (response.success) {
           console.log("✅ Standup data saved successfully to database");
           popupState.showDownloadButton = true;
-          statusDisplay.textContent = 'Status: Complete';
-          indicator.className = 'ai-scrum-indicator ready';
+          if (statusDisplay) statusDisplay.textContent = 'Status: Complete';
+          if (indicator) indicator.className = 'ai-scrum-indicator ready';
         } else {
           throw new Error(response.error || 'Failed to save conversation');
         }
       } else {
         console.warn("⚠️ No conversation data to save");
-        statusDisplay.textContent = 'Status: No Data';
-        indicator.className = 'ai-scrum-indicator ready';
+        if (statusDisplay) statusDisplay.textContent = 'Status: No Data';
+        if (indicator) indicator.className = 'ai-scrum-indicator ready';
       }
     } catch (error) {
       console.error("❌ Error saving standup data:", error);
-      statusDisplay.textContent = 'Status: Save Failed';
-      indicator.className = 'ai-scrum-indicator error';
+      if (statusDisplay) statusDisplay.textContent = 'Status: Save Failed';
+      if (indicator) indicator.className = 'ai-scrum-indicator error';
       alert("Failed to save standup data. Please try again.");
     }
 
     // Stop audio monitoring and cleanup
     stopAudioProgressMonitoring();
+    
+    // Stop mute state monitoring
+    stopMuteMonitoring();
     
     // Reset conversation state
     isAssistantSpeaking = false;
@@ -915,8 +1097,8 @@ function setupPopupEventListeners(popup) {
     const finalStatusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const finalIndicator = popup.querySelector('.ai-scrum-indicator');
     if (popupState.showDownloadButton) {
-      finalStatusDisplay.textContent = 'Status: Ready';
-      finalIndicator.className = 'ai-scrum-indicator ready';
+      if (finalStatusDisplay) finalStatusDisplay.textContent = 'Status: Ready';
+      if (finalIndicator) finalIndicator.className = 'ai-scrum-indicator ready';
     }
     
     // Refresh popup to show download button and correct button states
@@ -965,21 +1147,9 @@ function sendMessageToBackground(action, data) {
   });
 }
 
-// Update popup with microphone status (no volume level needed)
-function updatePopupMicrophoneStatus() {
-  let status = 'Ready';
-  if (isAssistantSpeaking) {
-    status = 'Muted';
-  } else if (isUserSpeaking) {
-    status = 'Listening';
-  } else if (isConnected) {
-    status = 'Ready';
-  }
-  
-  updateMicrophoneStatus(status);
-}
 
-// Function to update microphone status in popup
+
+// Function to update microphone status in popup (hidden but functional)
 function updateMicrophoneStatus(status) {
   const popup = document.getElementById('ai-scrum-popup-card');
   if (!popup) {
@@ -989,6 +1159,7 @@ function updateMicrophoneStatus(status) {
   const micText = popup.querySelector('.mic-text');
   const micIcon = popup.querySelector('.mic-icon');
 
+  // Update microphone status even when hidden (for functionality)
   if (micText) {
     micText.textContent = `Microphone: ${status}`;
   }
@@ -1015,8 +1186,16 @@ function startPeriodicPopupUpdates() {
   // Update popup every 200ms for smooth volume bar animation without excessive CPU usage
   setInterval(() => {
     if (isConnected) {
-      updatePopupMicrophoneStatus();
+      let status = 'Ready';
+      if (isAssistantSpeaking) {
+        status = 'Muted';
+      } else if (isUserSpeaking) {
+        status = 'Listening';
+      }
+      updatePopupMicrophoneStatus(status);
     }
+    // Always update Google Meet mute status
+    updateMeetMuteStatus();
   }, 200);
 }
 
@@ -1031,7 +1210,7 @@ function muteMicrophone() {
     }
 
     // Update popup status
-    updatePopupMicrophoneStatus();
+    updatePopupMicrophoneStatus('Muted');
   }
 }
 
@@ -1046,7 +1225,7 @@ function unmuteMicrophone() {
     }
 
     // Update popup status
-    updatePopupMicrophoneStatus();
+    updatePopupMicrophoneStatus('Ready');
   }
 }
 
@@ -1120,6 +1299,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     // Stop audio monitoring
     stopAudioProgressMonitoring();
+    
+    // Stop mute state monitoring
+    stopMuteMonitoring();
     
     // Reset conversation state
     isAssistantSpeaking = false;
@@ -1607,14 +1789,14 @@ function handleServerEvent(event) {
     if (event.type === "input_audio_buffer.speech_started") {
       console.log("👂 User started speaking");
       isUserSpeaking = true;
-      updatePopupMicrophoneStatus();
+      updatePopupMicrophoneStatus('Listening');
       return;
     }
 
     if (event.type === "input_audio_buffer.speech_stopped") {
       console.log("🛑 User finished speaking");
       isUserSpeaking = false;
-      updatePopupMicrophoneStatus();
+      updatePopupMicrophoneStatus('Ready');
       return;
     }
 
@@ -1763,7 +1945,7 @@ function testMicrophone() {
   } : "No track");
   
   // Test popup update
-  updatePopupMicrophoneStatus();
+  updatePopupMicrophoneStatus('Ready');
   
   console.log("🧪 [TEST] Microphone test completed. Speak to see volume changes!");
 }
