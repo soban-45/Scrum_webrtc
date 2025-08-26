@@ -5,7 +5,6 @@ import os
 import json
 
 
-EXCEL_FILE = "standup_meetings.xlsx"
 
 def summarize_standup_conversation(conversation):
     """

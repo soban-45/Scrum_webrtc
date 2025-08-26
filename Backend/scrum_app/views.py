@@ -264,7 +264,6 @@ def webrtc_signal(request):
 
 
 
-EXCEL_FILE = "standup_meetings.xlsx"
 
 
 class DownloadExcelView(APIView):
