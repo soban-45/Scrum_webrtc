@@ -67,31 +67,28 @@ Conversation:
         return []
     
     
-def save_standup_data(standup_list):
-    """
-    standup_list: list of dicts, each with name, completed_yesterday, plan_today, blockers, summary
-    """
+def save_standup_data(standup_list, excel_target):
     if not standup_list:
         return
 
-    rows = []
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    for s in standup_list:
-        rows.append({
-            "Date": now,
-            "Project Name": s.get("project_name", "Not specified"),
-            "Name": s.get("name", "Not specified"),
-            "Employee ID": s.get("employee_id", "Not specified"),
-            "Completed Yesterday": s.get("completed_yesterday", "Not specified"),
-            "Plan Today": s.get("plan_today", "Not specified"),
-            "Blockers": s.get("blockers", "None"),
-            "Summary": s.get("summary", "")
-        })
+    df_new = pd.DataFrame([{
+        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Project Name": s.get("project_name", "Not specified"),
+        "Name": s.get("name", "Not specified"),
+        "Employee ID": s.get("employee_id", "Not specified"),
+        "Completed Yesterday": s.get("completed_yesterday", "Not specified"),
+        "Plan Today": s.get("plan_today", "Not specified"),
+        "Blockers": s.get("blockers", "None"),
+        "Summary": s.get("summary", "")
+    } for s in standup_list])
 
-    if os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE)
-        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+    if isinstance(excel_target, str) and os.path.exists(excel_target):
+        df_existing = pd.read_excel(excel_target)
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+        df_combined.to_excel(excel_target, index=False)
+    elif hasattr(excel_target, "write"):
+        # In-memory write
+        df_new.to_excel(excel_target, index=False)
     else:
-        df = pd.DataFrame(rows)
-
-    df.to_excel(EXCEL_FILE, index=False)
+        # Initial creation
+        df_new.to_excel(excel_target, index=False)

@@ -21,8 +21,7 @@ import {
 import ConversationDisplay from "./ConversationDisplay";
 import LiveTranscript from "./LiveTranscript";
 
-const BACKEND_URL =
-  "http://localhost:8000"; // Replace with your backend URL
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 const pulse = keyframes`
   0% { transform: scale(1); opacity: 1; }
@@ -97,6 +96,18 @@ function VoiceAssistant() {
   const [lastPlans, setLastPlans] = useState({});
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
+  // Add effect to log member index changes
+  useEffect(() => {
+    if (members.length > 0) {
+      console.log(
+        `👤 Current highlighted member: ${memberIndex + 1}/${members.length} - ${members[memberIndex]?.name || "Unknown"}`,
+      );
+    }
+  }, [memberIndex, members]);
 
   const fetchLastStandup = async (employeeId) => {
     if (!employeeId) {
@@ -183,12 +194,36 @@ function VoiceAssistant() {
     return map;
   };
 
-  useEffect(() => {
-    fetch(`${BACKEND_URL}/projects/`)
-      .then((res) => res.json())
-      .then((data) => setProjectList(data))
-      .catch((err) => console.error("Error fetching projects", err));
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    if (!userEmail.trim()) {
+      setEmailError("Please enter your email");
+      return;
+    }
 
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/projects/?email=${encodeURIComponent(userEmail.trim())}`,
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        setEmailError(errorData.error || "Failed to fetch projects");
+        return;
+      }
+
+      const data = await res.json();
+      setProjectList(data);
+      setEmailSubmitted(true);
+      setEmailError("");
+      console.log(`✅ Found ${data.length} projects for email: ${userEmail}`);
+    } catch (err) {
+      console.error("Error fetching projects for email:", err);
+      setEmailError("Failed to fetch projects. Please try again.");
+    }
+  };
+
+  useEffect(() => {
     // Initialize remote audio element
     remoteAudioRef.current = document.createElement("audio");
     remoteAudioRef.current.autoplay = true;
@@ -292,6 +327,7 @@ function VoiceAssistant() {
     setSelectedProject(projectId);
     setMemberIndex(0);
     setStandupResults([]);
+    setShowDownloadButton(false);
     try {
       const res = await fetch(
         `${BACKEND_URL}/projects/?project_id=${projectId}`,
@@ -313,6 +349,18 @@ function VoiceAssistant() {
     }
   };
 
+  const handleResetEmail = () => {
+    setEmailSubmitted(false);
+    setUserEmail("");
+    setEmailError("");
+    setProjectList([]);
+    setSelectedProject(null);
+    setProjectDetails(null);
+    setMembers([]);
+    setLastPlans({});
+    setShowDownloadButton(false);
+  };
+
   const buildDynamicSystemMessage = (
     project,
     membersList,
@@ -326,7 +374,7 @@ function VoiceAssistant() {
       .map((m) => {
         const last = lastPlansMap[m.employee_id];
         if (!last)
-          return `${m.name}: No previous standup data available - this will be their first standup.`;
+          return `${m.name}: No previous standup data available - this will be their first standup. Ask about: 1) What they accomplished yesterday, 2) Today's plans, 3) Any blockers from yesterday that might still affect them, 4) Any current blockers for today.`;
 
         const dateStr = last.Date
           ? new Date(last.Date).toLocaleDateString()
@@ -386,6 +434,11 @@ HANDLING PREVIOUS STANDUP DATA - CRITICAL INSTRUCTIONS:
 - If they have previous data, reference it directly: "Hey [Name]! I see you were planning to work on '[EXACT previous plan text]' today - how did that go?"
 - If they had blockers, ask: "I also remember you mentioned '[EXACT previous blocker text]' - did you resolve that?"
 - If no previous data: "Hi [Name]! Let's start with what you accomplished yesterday"
+- For members with no previous data, ALWAYS ask these questions in order:
+  1. "What did you accomplish yesterday?"
+  2. "What are you planning to work on today?"
+  3. "Did you have any blockers yesterday that might still be affecting you?"
+  4. "Do you have any current blockers for today's work?"
 - NEVER make up or assume tasks - only use the exact text provided
 - Be encouraging: "Great job on that!" or "Nice progress!"
 
@@ -561,7 +614,10 @@ CRITICAL RULES:
           audioStateRef.current.isAudioPlaying = false;
           audioStateRef.current.audioEndedNaturally = true; // Set flag
           stopAudioProgressMonitoring(); // Stop monitoring
-          checkAndUnmuteMicrophone("audio_track_ended", audioStateRef.current.currentResponseId);
+          checkAndUnmuteMicrophone(
+            "audio_track_ended",
+            audioStateRef.current.currentResponseId,
+          );
         };
 
         remoteAudioRef.current.onpause = () => {
@@ -704,7 +760,7 @@ CRITICAL RULES:
         duration: isFinite(duration) ? duration.toFixed(1) : "∞",
         isPlaying,
         timeAdvancing,
-        ended: remoteAudio.ended
+        ended: remoteAudio.ended,
       });
 
       // If audio stopped advancing for more than 1 second, consider it finished
@@ -712,7 +768,10 @@ CRITICAL RULES:
         console.log("⚠️ Audio stopped advancing - considering finished");
         audioState.isAudioPlaying = false;
         stopAudioProgressMonitoring();
-        checkAndUnmuteMicrophone("audio_progress_stopped", audioState.currentResponseId);
+        checkAndUnmuteMicrophone(
+          "audio_progress_stopped",
+          audioState.currentResponseId,
+        );
       }
     }, 500); // Check every 500ms
   };
@@ -759,7 +818,8 @@ CRITICAL RULES:
     }
 
     // For other events, ensure all conditions are met and audio is truly finished
-    const allConditionsMet = !audioState.isAudioPlaying &&
+    const allConditionsMet =
+      !audioState.isAudioPlaying &&
       audioState.isTranscriptComplete &&
       audioState.isResponseComplete &&
       audioState.isAudioStreamComplete;
@@ -767,8 +827,9 @@ CRITICAL RULES:
     if (allConditionsMet) {
       // Double-check that audio element is not playing
       const remoteAudio = remoteAudioRef.current;
-      const isAudioElementPlaying = remoteAudio && 
-        !remoteAudio.paused && 
+      const isAudioElementPlaying =
+        remoteAudio &&
+        !remoteAudio.paused &&
         !remoteAudio.ended &&
         remoteAudio.readyState > 0;
 
@@ -893,7 +954,9 @@ CRITICAL RULES:
       }
 
       if (event.type === "output_audio_buffer.stopped") {
-        console.log("[OUTPUT AUDIO] Stopped - Audio playback has ended, unmuting microphone");
+        console.log(
+          "[OUTPUT AUDIO] Stopped - Audio playback has ended, unmuting microphone",
+        );
         audioStateRef.current.isAudioPlaying = false;
         audioStateRef.current.audioEndedNaturally = true;
         stopAudioProgressMonitoring();
@@ -1000,9 +1063,21 @@ CRITICAL RULES:
           if (
             lower.includes("thanks") ||
             lower.includes("moving to the next member") ||
-            lower.includes("next person")
+            lower.includes("next person") ||
+            lower.includes("next member") ||
+            lower.includes("moving to") ||
+            lower.includes("let me move to") ||
+            lower.includes("next:") ||
+            (lower.includes("next") &&
+              (lower.includes("member") || lower.includes("person")))
           ) {
-            console.log("🔄 Detected member transition in AI response");
+            console.log(
+              "🔄 Detected member transition in AI response:",
+              finalTranscript,
+            );
+            console.log(
+              `Current member index: ${memberIndex}, Total members: ${members.length}`,
+            );
             handleMemberTransition();
           }
         }
@@ -1045,6 +1120,13 @@ CRITICAL RULES:
     const nextIndex = memberIndex + 1;
     if (nextIndex < members.length) {
       setMemberIndex(nextIndex);
+      console.log(
+        `🔄 Moved to member ${nextIndex + 1} of ${members.length}: ${members[nextIndex]?.name}`,
+      );
+    } else {
+      console.log(`✅ Completed all ${members.length} team members`);
+      // Optional: Reset to first member or keep at last member
+      // setMemberIndex(0); // Uncomment to cycle back to first member
     }
   };
 
@@ -1182,6 +1264,10 @@ CRITICAL RULES:
   };
 
   const startConversation = async () => {
+    if (!emailSubmitted) {
+      alert("Please enter your email first.");
+      return;
+    }
     if (!projectDetails || members.length === 0) {
       alert("Please select a project with members first.");
       return;
@@ -1251,24 +1337,36 @@ CRITICAL RULES:
   };
 
   const downloadExcel = async () => {
+    if (!selectedProject) {
+      alert("Please select a project first.");
+      return;
+    }
+
     setIsDownloading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/download-excel/`);
-      
+      const response = await fetch(
+        `${BACKEND_URL}/download-excel/?project_id=${selectedProject}`,
+      );
+
       if (!response.ok) {
         throw new Error(`Download failed: ${response.status}`);
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+
+      const link = document.createElement("a");
       link.href = url;
-      link.download = 'standup_meetings.xlsx';
+
+      // Optional: Use project name or ID for filename
+      const filename = `standup_${selectedProject}.xlsx`;
+      link.download = filename;
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       console.log("✅ Excel file downloaded successfully");
     } catch (error) {
       console.error("❌ Download error:", error);
@@ -1298,7 +1396,9 @@ CRITICAL RULES:
         setConversation([]);
         setLiveTranscript("");
         setShowDownloadButton(true); // Show download button after successful save
-        console.log("✅ Standup data saved successfully - Download now available");
+        console.log(
+          "✅ Standup data saved successfully - Download now available",
+        );
       }
     } catch (err) {
       console.error("Save Error:", err);
@@ -1448,51 +1548,122 @@ CRITICAL RULES:
             height: "100%",
           }}
         >
-          {/* Project Selection */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-              Select Project
-            </Typography>
-            <Box
-              sx={{
-                position: "relative",
-                "&:after": {
-                  content: '"▼"',
-                  position: "absolute",
-                  right: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  pointerEvents: "none",
-                  color: "primary.main",
-                },
-              }}
-            >
-              <select
-                onChange={handleProjectSelect}
-                value={selectedProject || ""}
-                style={{
-                  width: "100%",
-                  padding: "8px 32px 8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #6c5ce7",
-                  backgroundColor: "rgba(255, 255, 255, 0.8)",
-                  appearance: "none",
-                  outline: "none",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              >
-                <option value="" disabled>
-                  Select a project
-                </option>
-                {projectList.map((proj) => (
-                  <option key={proj.id} value={proj.id}>
-                    {proj.project_name}
-                  </option>
-                ))}
-              </select>
+          {/* Email Input Section */}
+          {!emailSubmitted ? (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                Enter Your Email
+              </Typography>
+              <form onSubmit={handleEmailSubmit}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <input
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="your.email@company.com"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: `1px solid ${emailError ? "#f44336" : "#6c5ce7"}`,
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      outline: "none",
+                      fontSize: "14px",
+                    }}
+                  />
+                  {emailError && (
+                    <Typography variant="caption" sx={{ color: "error.main" }}>
+                      {emailError}
+                    </Typography>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="small"
+                    sx={{
+                      bgcolor: "primary.main",
+                      "&:hover": { bgcolor: "primary.dark" },
+                    }}
+                  >
+                    Get My Projects
+                  </Button>
+                </Box>
+              </form>
             </Box>
-          </Box>
+          ) : (
+            <>
+              {/* Email Display and Reset */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Your Email
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    label={userEmail}
+                    variant="outlined"
+                    size="small"
+                    sx={{ bgcolor: "rgba(108, 92, 231, 0.1)" }}
+                  />
+                  <Button
+                    onClick={handleResetEmail}
+                    size="small"
+                    variant="text"
+                    sx={{ fontSize: "12px", textTransform: "none" }}
+                  >
+                    Change
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Project Selection */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Select Project ({projectList.length} available)
+                </Typography>
+                <Box
+                  sx={{
+                    position: "relative",
+                    "&:after": {
+                      content: '"▼"',
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                      color: "primary.main",
+                    },
+                  }}
+                >
+                  <select
+                    onChange={handleProjectSelect}
+                    value={selectedProject || ""}
+                    style={{
+                      width: "100%",
+                      padding: "8px 32px 8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #6c5ce7",
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      appearance: "none",
+                      outline: "none",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="" disabled>
+                      Select a project
+                    </option>
+                    {projectList.map((project) => (
+                      <option
+                        key={project.project_id}
+                        value={project.project_id}
+                      >
+                        {project.project_name}
+                      </option>
+                    ))}
+                  </select>
+                </Box>
+              </Box>
+            </>
+          )}
 
           {/* Team Members Section */}
           <Box
@@ -1516,7 +1687,26 @@ CRITICAL RULES:
               <PeopleIcon fontSize="small" /> Team Members
             </Typography>
 
-            {projectDetails ? (
+            {!emailSubmitted ? (
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  color: "text.secondary",
+                }}
+              >
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Enter your email first
+                </Typography>
+                <Typography variant="body2">
+                  We'll show only projects assigned to you
+                </Typography>
+              </Box>
+            ) : projectDetails ? (
               <Box
                 sx={{
                   flexGrow: 1,
@@ -1669,7 +1859,9 @@ CRITICAL RULES:
             !isAssistantSpeaking &&
             sessionConfigured &&
             "⏸️ Your turn to speak"}
-          {showDownloadButton && !isListening && "📊 Standup complete - Download Excel file available"}
+          {showDownloadButton &&
+            !isListening &&
+            "📊 Standup complete - Download Excel file available"}
         </Typography>
       </Box>
     </Box>
