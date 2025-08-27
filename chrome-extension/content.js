@@ -1,4 +1,3 @@
-
 // Content script loaded - AI Scrum Chrome Extension
 
 const BACKEND_URL = "http://localhost:8000";
@@ -38,6 +37,8 @@ let popupState = {
   emailError: ""
 };
 
+
+
 // Conversation state
 let conversation = [];
 
@@ -63,6 +64,20 @@ function showPopupCard() {
 
   // Add event listeners
   setupPopupEventListeners(popup);
+
+  // Automatically test email fetching when popup is shown
+  console.log("🚀 [POPUP] Popup shown, testing email fetch...");
+  setTimeout(() => {
+    testGetUserEmail().then(email => {
+      if (email) {
+        console.log("📧 [POPUP] Auto-fetched email on popup open:", email);
+        // Update popup state with fetched email
+        popupState.userEmail = email;
+        // Refresh popup to show the email
+        refreshPopup();
+      }
+    });
+  }, 500); // Small delay to ensure popup is fully rendered
 }
 
 function createPopupHTML() {
@@ -1969,6 +1984,42 @@ function handleMemberTransition() {
 
 // Expose test function globally for debugging
 window.testAIScrumMicrophone = testMicrophone;
+
+// Expose email test function globally for debugging
+window.testGetUserEmail = testGetUserEmail;
+
+// Test function to fetch user email using Chrome Identity API
+async function testGetUserEmail() {
+  console.log("🔍 [TEST] Testing Chrome Identity API email fetching...");
+  
+  try {
+    const response = await sendMessageToBackground('GET_USER_EMAIL');
+    if (response.success) {
+      console.log("✅ [TEST] Email fetched successfully:", response.email);
+      // You can also update the popup state with this email
+      if (response.email && !popupState.userEmail) {
+        popupState.userEmail = response.email;
+        console.log("📧 [TEST] Auto-filled email in popup state:", response.email);
+      }
+      return response.email;
+    } else {
+      console.error("❌ [TEST] Failed to fetch email:", response.error);
+      
+      // If we have additional diagnostic info, show it
+      if (response.userInfo) {
+        console.log("📋 [TEST] User info details:", response.userInfo);
+      }
+      if (response.suggestion) {
+        console.log("💡 [TEST] Suggestion:", response.suggestion);
+      }
+      
+      return null;
+    }
+  } catch (error) {
+    console.error("❌ [TEST] Error in testGetUserEmail:", error);
+    return null;
+  }
+}
 
 // Initialize popup styles when the script loads
 loadPopupStyles();
