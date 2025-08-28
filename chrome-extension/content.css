@@ -193,9 +193,22 @@
 
 .ai-scrum-popup-buttons {
   display: flex;
-  justify-content: space-around;
+  flex-direction: column;
   gap: 10px;
   transition: all 0.3s ease-out;
+}
+
+/* Top row for Start and Stop buttons */
+.ai-scrum-popup-buttons .session-controls {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+/* Bottom row for Download button */
+.ai-scrum-popup-buttons .download-controls {
+  display: flex;
+  justify-content: center;
 }
 
 /* Buttons in minimized state */
@@ -203,6 +216,7 @@
   gap: 6px;
   flex: 1;
   justify-content: center;
+  flex-direction: row; /* Override to horizontal for minimized state */
 }
 
 .ai-scrum-popup-btn {
@@ -591,19 +605,59 @@
 .ai-scrum-popup-btn.download-btn {
   background-color: #4caf50;
   color: white;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  animation: slideInFromRight 0.5s ease-out;
+  width: 100%; /* Full width in its own row */
+  max-width: 200px; /* But not too wide */
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .ai-scrum-popup-btn.download-btn:hover:not([disabled]) {
   background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.ai-scrum-popup-btn.download-btn:active:not([disabled]) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+}
+
+.ai-scrum-popup-btn.download-btn:disabled {
+  background-color: #a5d6a7;
+  color: #e8f5e8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .minimized-btn.download-btn {
   background: rgba(76, 175, 80, 0.8);
   border-color: rgba(76, 175, 80, 0.6);
+  transition: all 0.3s ease;
 }
 
 .minimized-btn.download-btn:hover:not([disabled]) {
   background: rgba(76, 175, 80, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.minimized-btn.download-btn:active:not([disabled]) {
+  transform: scale(1.05);
 }
 
 /* Scrollbar Styles */

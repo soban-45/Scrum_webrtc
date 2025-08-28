@@ -131,16 +131,22 @@ function createPopupHTML() {
       
       <!-- Action Buttons -->
       <div class="ai-scrum-popup-buttons">
-        <button class="ai-scrum-popup-btn start-btn" id="start-session-btn" ${!canStartSession() || isConnected ? 'disabled' : ''}>
-          <span>▶</span> Start Session
-        </button>
-        <button class="ai-scrum-popup-btn stop-btn" id="stop-session-btn" ${!isConnected ? 'disabled' : ''}>
-          <span>⏹</span> Stop Session
-        </button>
+        <!-- Top row: Start and Stop buttons -->
+        <div class="session-controls">
+          <button class="ai-scrum-popup-btn start-btn" id="start-session-btn" ${!canStartSession() || isConnected ? 'disabled' : ''}>
+            <span>▶</span> Start Session
+          </button>
+          <button class="ai-scrum-popup-btn stop-btn" id="stop-session-btn" ${!isConnected ? 'disabled' : ''}>
+            <span>⏹</span> Stop Session
+          </button>
+        </div>
+        <!-- Bottom row: Download button -->
         ${popupState.showDownloadButton ? `
-        <button class="ai-scrum-popup-btn download-btn" id="download-excel-btn" ${popupState.isDownloading ? 'disabled' : ''}>
-          <span>💾</span> ${popupState.isDownloading ? 'Downloading...' : 'Download Excel'}
-        </button>
+        <div class="download-controls">
+          <button class="ai-scrum-popup-btn download-btn" id="download-excel-btn" ${popupState.isDownloading ? 'disabled' : ''}>
+            <span>💾</span> ${popupState.isDownloading ? 'Downloading...' : 'Download Excel'}
+          </button>
+        </div>
         ` : ''}
       </div>
     </div>
@@ -443,11 +449,8 @@ function createRemoteAudioElement() {
 // Enhanced microphone setup with advanced noise suppression
 async function setupMicrophone() {
   try {
-    // Check if Google Meet is muted before accessing microphone
-    if (isGoogleMeetMuted()) {
-      console.log("🎤 Google Meet is muted - not accessing microphone");
-      throw new Error("Google Meet is muted. Please unmute to use AI Scrum.");
-    }
+    // Allow microphone access regardless of Google Meet mute state
+    console.log("🎤 Setting up microphone - Google Meet mute state will be handled separately");
 
     // Enhanced microphone settings optimized for headphones and noise suppression
     userStream = await navigator.mediaDevices.getUserMedia({
@@ -592,41 +595,55 @@ function monitorAudioLevels() {
   checkAudioLevel();
 }
 
-// Enhanced mute state detection
+// Enhanced mute state detection - ONLY for microphone/audio, not video
 function isGoogleMeetMuted() {
-  // Method 1: Check mute button state
-  const muteButton = document.querySelector('[aria-label*="mute"], [aria-label*="Mute"]');
-  if (muteButton) {
-    const ariaLabel = muteButton.getAttribute('aria-label') || '';
-    if (ariaLabel.includes('unmute') || ariaLabel.includes('Turn on microphone')) {
-      return true; // Muted
+  // Method 1: Check microphone mute button state specifically
+  const micMuteButton = document.querySelector('[aria-label*="microphone"], [aria-label*="Microphone"], [aria-label*="mute microphone"], [aria-label*="Mute microphone"]');
+  if (micMuteButton) {
+    const ariaLabel = micMuteButton.getAttribute('aria-label') || '';
+    // Only return true if it's specifically about microphone unmuting
+    if (ariaLabel.includes('unmute') && (ariaLabel.includes('microphone') || ariaLabel.includes('mic'))) {
+      return true; // Microphone is muted
+    }
+    if (ariaLabel.includes('Turn on microphone') || ariaLabel.includes('Enable microphone')) {
+      return true; // Microphone is muted
     }
   }
   
-  // Method 2: Check for muted icon classes
-  const mutedSelectors = [
-    '.muted-icon',
-    '.mic-off',
-    '[data-muted="true"]',
-    '[data-is-muted="true"]',
-    '.muted',
-    '.mic-disabled'
+  // Method 2: Check for microphone-specific muted indicators
+  const micMutedSelectors = [
+    '[data-mic-muted="true"]',
+    '[data-audio-muted="true"]',
+    '.mic-muted',
+    '.audio-muted',
+    '.microphone-off'
   ];
   
-  for (const selector of mutedSelectors) {
+  for (const selector of micMutedSelectors) {
     if (document.querySelector(selector)) {
       return true;
     }
   }
   
-  // Method 3: Check button text content
-  const muteTexts = ['unmute', 'Turn on microphone', 'Enable microphone'];
+  // Method 3: Look for microphone-specific button text
+  const micMuteTexts = ['unmute microphone', 'turn on microphone', 'enable microphone', 'unmute mic', 'turn on mic'];
   const allButtons = document.querySelectorAll('button');
   
   for (const button of allButtons) {
     const buttonText = button.textContent?.toLowerCase() || '';
-    if (muteTexts.some(text => buttonText.includes(text))) {
+    if (micMuteTexts.some(text => buttonText.includes(text))) {
       return true;
+    }
+  }
+  
+  // Method 4: Check for video mute buttons to ensure we're not confusing them
+  const videoMuteButton = document.querySelector('[aria-label*="camera"], [aria-label*="Camera"], [aria-label*="video"], [aria-label*="Video"]');
+  if (videoMuteButton) {
+    const videoAriaLabel = videoMuteButton.getAttribute('aria-label') || '';
+    // If we find a video mute button, make sure we're not accidentally detecting it as audio mute
+    if (videoAriaLabel.includes('unmute') && (videoAriaLabel.includes('camera') || videoAriaLabel.includes('video'))) {
+      // This is video mute, not audio mute - ignore it
+      console.log("🎥 Detected video mute - not affecting microphone access");
     }
   }
   
@@ -659,11 +676,14 @@ function resumeMicrophoneAccess() {
 function startMuteStateMonitoring() {
   // Monitor for changes in Google Meet's mute state
   const observer = new MutationObserver(() => {
-    if (isGoogleMeetMuted() && userAudioTrack && userAudioTrack.enabled) {
-      console.log("🎤 Google Meet muted - stopping microphone access");
+    const isMuted = isGoogleMeetMuted();
+    console.log("🔍 Mute state check - isGoogleMeetMuted():", isMuted);
+    
+    if (isMuted && userAudioTrack && userAudioTrack.enabled) {
+      console.log("🎤 Google Meet microphone muted - stopping microphone access");
       stopMicrophoneAccess();
-    } else if (!isGoogleMeetMuted() && userAudioTrack && !userAudioTrack.enabled && isConnected) {
-      console.log("🎤 Google Meet unmuted - resuming microphone access");
+    } else if (!isMuted && userAudioTrack && !userAudioTrack.enabled && isConnected) {
+      console.log("🎤 Google Meet microphone unmuted - resuming microphone access");
       resumeMicrophoneAccess();
     }
   });
@@ -922,11 +942,7 @@ function setupPopupEventListeners(popup) {
       return;
     }
 
-    // Check if Google Meet is muted before starting
-    if (isGoogleMeetMuted()) {
-      alert("🎤 Google Meet is currently muted. Please unmute your microphone in Google Meet first, then try starting the session again.");
-      return;
-    }
+
 
     console.log('[Content] Start clicked: establishing WebRTC connection with project context');
     
@@ -1976,9 +1992,9 @@ function handleMemberTransition() {
   } else {
     console.log(`✅ Completed all ${projectContext.members.length} team members`);
     
-    // All members completed - show download button in popup
-    popupState.showDownloadButton = true;
-    refreshPopup();
+    // All members completed - but don't show download button automatically
+    // User must manually stop the session to see the download button
+    console.log("📋 All team members completed. Click 'Stop Session' to save data and download Excel.");
   }
 }
 
