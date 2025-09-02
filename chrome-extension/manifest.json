@@ -8,14 +8,19 @@
     "activeTab",
     "scripting",
     "storage",
-    "downloads"
+    "downloads",
+    "identity",
+    "tabs",
+    "identity.email"
   ],
 
   "host_permissions": [
     "https://meet.google.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
-    "http://localhost:8000/*"
+    "http://localhost:8000/*",
+    "https://accounts.google.com/*",
+    "https://www.googleapis.com/*"
   ],
 
   "background": {
