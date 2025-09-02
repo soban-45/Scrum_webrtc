@@ -7,6 +7,47 @@ const BACKEND_URL = "http://localhost:8000";
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[AI SCRUM] Message received:", message);
 
+  // Get user email using Chrome Identity API
+  if (message.action === "GET_USER_EMAIL") {
+    console.log("[AI SCRUM] 🔍 Fetching user email using Chrome Identity API...");
+    
+    try {
+      chrome.identity.getProfileUserInfo(
+        { accountStatus: "ANY" },
+        (userInfo) => {
+          if (chrome.runtime.lastError) {
+            console.error("[AI SCRUM] ❌ Error getting user email:", chrome.runtime.lastError);
+            sendResponse({
+              success: false,
+              error: chrome.runtime.lastError.message,
+            });
+          } else if (userInfo.email) {
+            console.log("[AI SCRUM] ✅ User email fetched successfully:", userInfo.email);
+            sendResponse({ success: true, email: userInfo.email });
+          } else {
+            console.log("[AI SCRUM] ⚠️ No email available in user profile");
+            sendResponse({ 
+              success: false, 
+              error: "No email available - user may not be signed into Chrome with Google account"
+            });
+          }
+        },
+      );
+    } catch (error) {
+      console.error("[AI SCRUM] ❌ Exception in getUserEmail:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+    
+    return true; // Keep message channel open for async response
+  }
+
+  // PING handler for testing
+  if (message.action === "PING") {
+    console.log("[AI SCRUM] 🏓 PING received - extension is alive!");
+    sendResponse({ success: true, message: "AI Scrum extension is responding!" });
+    return false; // Synchronous response
+  }
+
   // Backend API calls
   if (message.action === "fetchProjects") {
     console.log("[AI SCRUM] Fetching projects for email:", message.email);
