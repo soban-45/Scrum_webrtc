@@ -66,11 +66,9 @@ function showPopupCard() {
   setupPopupEventListeners(popup);
 
   // Automatically test email fetching when popup is shown
-  console.log("🚀 [POPUP] Popup shown, testing email fetch...");
   setTimeout(() => {
     testGetUserEmail().then(email => {
       if (email) {
-        console.log("📧 [POPUP] Auto-fetched email on popup open:", email);
         // Update popup state with fetched email
         popupState.userEmail = email;
         // Refresh popup to show the email
@@ -345,11 +343,7 @@ function buildDynamicSystemMessage(project, membersList, lastPlansMap = {}) {
     })
     .join("\n");
 
-  console.log("🤖 Building AI system message with context:", {
-    project: project.project_name,
-    memberCount: membersList.length,
-    membersWithPreviousData: Object.values(lastPlansMap).filter(Boolean).length,
-  });
+
 
   return `You are a friendly, warm, and enthusiastic standup facilitator for "${project.project_name}" - think of yourself as an Alexa-like assistant with lots of personality! Your goal is to create a comfortable, supportive environment while gathering standup updates.
 
@@ -450,7 +444,6 @@ function createRemoteAudioElement() {
 async function setupMicrophone() {
   try {
     // Allow microphone access regardless of Google Meet mute state
-    console.log("🎤 Setting up microphone - Google Meet mute state will be handled separately");
 
     // Enhanced microphone settings optimized for headphones and noise suppression
     userStream = await navigator.mediaDevices.getUserMedia({
@@ -643,7 +636,6 @@ function isGoogleMeetMuted() {
     // If we find a video mute button, make sure we're not accidentally detecting it as audio mute
     if (videoAriaLabel.includes('unmute') && (videoAriaLabel.includes('camera') || videoAriaLabel.includes('video'))) {
       // This is video mute, not audio mute - ignore it
-      console.log("🎥 Detected video mute - not affecting microphone access");
     }
   }
   
@@ -654,7 +646,6 @@ function isGoogleMeetMuted() {
 function stopMicrophoneAccess() {
   if (userAudioTrack && userAudioTrack.readyState === "live") {
     userAudioTrack.enabled = false;
-    console.log("🎤 Microphone access stopped due to Google Meet mute");
     
     // Update UI to show microphone is disabled
     updatePopupMicrophoneStatus('Disabled (Meet Muted)');
@@ -665,7 +656,6 @@ function stopMicrophoneAccess() {
 function resumeMicrophoneAccess() {
   if (userAudioTrack && userAudioTrack.readyState === "live") {
     userAudioTrack.enabled = true;
-    console.log("🎤 Microphone access resumed");
     
     // Update UI to show microphone is ready
     updatePopupMicrophoneStatus('Ready');
@@ -677,13 +667,10 @@ function startMuteStateMonitoring() {
   // Monitor for changes in Google Meet's mute state
   const observer = new MutationObserver(() => {
     const isMuted = isGoogleMeetMuted();
-    console.log("🔍 Mute state check - isGoogleMeetMuted():", isMuted);
     
     if (isMuted && userAudioTrack && userAudioTrack.enabled) {
-      console.log("🎤 Google Meet microphone muted - stopping microphone access");
       stopMicrophoneAccess();
     } else if (!isMuted && userAudioTrack && !userAudioTrack.enabled && isConnected) {
-      console.log("🎤 Google Meet microphone unmuted - resuming microphone access");
       resumeMicrophoneAccess();
     }
   });
@@ -808,7 +795,7 @@ function setupPopupEventListeners(popup) {
           popupState.userEmail = email;
           popupState.emailSubmitted = true;
           popupState.projectList = response.data;
-          console.log(`✅ Found ${response.data.length} projects for email: ${email}`);
+
           refreshPopup();
         } else {
           throw new Error(response.error || 'Failed to fetch projects');
@@ -868,7 +855,7 @@ function setupPopupEventListeners(popup) {
             popupState.lastPlans = lastPlansResponse.data;
           }
 
-          console.log(`✅ Loaded project: ${projectDetails.project_name} with ${members.length} members`);
+
           refreshPopup();
         } else {
           throw new Error(response.error || 'Failed to fetch project details');
@@ -895,7 +882,7 @@ function setupPopupEventListeners(popup) {
       try {
         const response = await sendMessageToBackground('downloadExcel', { projectId: popupState.selectedProject });
         if (response.success) {
-          console.log("✅ Excel file downloaded successfully");
+  
         } else {
           throw new Error(response.error || 'Download failed');
         }
@@ -944,7 +931,7 @@ function setupPopupEventListeners(popup) {
 
 
 
-    console.log('[Content] Start clicked: establishing WebRTC connection with project context');
+
     
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
     const indicator = popup.querySelector('.ai-scrum-indicator');
@@ -977,16 +964,11 @@ function setupPopupEventListeners(popup) {
         const maxAttempts = 20; // 10 seconds maximum wait
         
         const checkDataChannelReady = () => {
-          console.log(`[Content] Checking data channel readiness - attempt ${attempts + 1}/${maxAttempts}`);
-          console.log(`[Content] isConnected: ${isConnected}, dataChannel exists: ${!!dataChannel}, readyState: ${dataChannel?.readyState}`);
-          
           if (isConnected && dataChannel && dataChannel.readyState === "open") {
             // Now trigger AI to speak with project context
-            console.log('[Content] Data channel ready, starting AI conversation');
             startAIConversation();
             if (statusDisplay) statusDisplay.textContent = 'Status: Active';
             if (indicator) indicator.className = 'ai-scrum-indicator active';
-            console.log('[Content] AI speaking started with project context');
             
             // Update button states after successful connection
             refreshPopup();
@@ -995,7 +977,6 @@ function setupPopupEventListeners(popup) {
             // Check again in 500ms
             setTimeout(checkDataChannelReady, 500);
           } else {
-            console.error('[Content] Data channel not ready after maximum attempts');
             if (statusDisplay) statusDisplay.textContent = 'Status: Connection Timeout';
             if (indicator) indicator.className = 'ai-scrum-indicator error';
             
@@ -1028,7 +1009,7 @@ function setupPopupEventListeners(popup) {
       return;
     }
 
-    console.log('[Content] Stopping AI session');
+
 
     // Update status
     const statusDisplay = popup.querySelector('.ai-scrum-status-display span');
@@ -1039,16 +1020,12 @@ function setupPopupEventListeners(popup) {
     // Send end conversation to backend to save standup data (like VoiceAssistant.jsx)
     try {
       if (popupState.selectedProject && conversation.length > 0) {
-        console.log("💾 Saving conversation data to database...");
-        console.log(`📊 Conversation has ${conversation.length} messages`);
-        
         const response = await sendMessageToBackground('endConversation', {
           projectId: popupState.selectedProject,
           conversation: conversation.filter((msg) => msg.role !== "system")
         });
 
         if (response.success) {
-          console.log("✅ Standup data saved successfully to database");
           popupState.showDownloadButton = true;
           if (statusDisplay) statusDisplay.textContent = 'Status: Complete';
           if (indicator) indicator.className = 'ai-scrum-indicator ready';
@@ -1056,12 +1033,10 @@ function setupPopupEventListeners(popup) {
           throw new Error(response.error || 'Failed to save conversation');
         }
       } else {
-        console.warn("⚠️ No conversation data to save");
         if (statusDisplay) statusDisplay.textContent = 'Status: No Data';
         if (indicator) indicator.className = 'ai-scrum-indicator ready';
       }
     } catch (error) {
-      console.error("❌ Error saving standup data:", error);
       if (statusDisplay) statusDisplay.textContent = 'Status: Save Failed';
       if (indicator) indicator.className = 'ai-scrum-indicator error';
       alert("Failed to save standup data. Please try again.");
@@ -1106,20 +1081,7 @@ function setupPopupEventListeners(popup) {
     dataChannel = null;
     isConnected = false;
     
-    // Log conversation summary before clearing
-    if (conversation.length > 0) {
-      console.log("📋 =================================");
-      console.log("📊 CONVERSATION SUMMARY (SESSION END):");
-      console.log(`📈 Total messages: ${conversation.length}`);
-      console.log(`👤 User messages: ${conversation.filter(msg => msg.role === 'user').length}`);
-      console.log(`🤖 Assistant messages: ${conversation.filter(msg => msg.role === 'assistant').length}`);
-      console.log("📋 Full conversation:");
-      conversation.forEach((msg, index) => {
-        const icon = msg.role === 'user' ? '👤' : '🤖';
-        console.log(`  ${index + 1}. ${icon} ${msg.role.toUpperCase()}: "${msg.content}"`);
-      });
-      console.log("📋 =================================");
-    }
+
     
     // Clear conversation after saving
     conversation = [];
@@ -1262,14 +1224,12 @@ function unmuteMicrophone() {
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[AI SCRUM] Content received message:", message);
 
   // Handle WebRTC connect request from background/popup
   if (message.action === "connectWebRTC") {
     // Store project context if provided
     if (message.projectContext) {
       projectContext = { ...message.projectContext };
-      console.log("📋 Project context stored:", projectContext);
     }
     
     connectToAIBot()
@@ -1283,7 +1243,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Store project context if provided
     if (message.projectContext) {
       projectContext = { ...message.projectContext };
-      console.log("📋 Project context updated for speaking:", projectContext);
     }
 
     if (!isConnected || !dataChannel || dataChannel.readyState !== "open") {
@@ -1317,14 +1276,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             conversation: conversation.filter((msg) => msg.role !== "system"),
           }),
         }).then(response => {
-          if (response.ok) {
-            console.log("✅ Conversation data saved to backend");
-          }
         }).catch(error => {
-          console.error("❌ Failed to save conversation data:", error);
         });
       } catch (error) {
-        console.error("❌ Error sending conversation data:", error);
       }
     }
     
@@ -1367,20 +1321,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     dataChannel = null;
     isConnected = false;
     
-    // Log conversation summary before clearing
-    if (conversation.length > 0) {
-      console.log("📋 =================================");
-      console.log("📊 CONVERSATION SUMMARY (STOP BOT):");
-      console.log(`📈 Total messages: ${conversation.length}`);
-      console.log(`👤 User messages: ${conversation.filter(msg => msg.role === 'user').length}`);
-      console.log(`🤖 Assistant messages: ${conversation.filter(msg => msg.role === 'assistant').length}`);
-      console.log("📋 Full conversation:");
-      conversation.forEach((msg, index) => {
-        const icon = msg.role === 'user' ? '👤' : '🤖';
-        console.log(`  ${index + 1}. ${icon} ${msg.role.toUpperCase()}: "${msg.content}"`);
-      });
-      console.log("📋 =================================");
-    }
+
     
     conversation = [];
     projectContext = {
@@ -1437,7 +1378,7 @@ function handleAIEvent(event) {
       break;
 
     case "input_audio_buffer.speech_stopped":
-      // User stopped speaking
+      console.log("🛑 User finished speaking");
       break;
 
     case "conversation.item.input_audio_transcription.completed":
@@ -1545,7 +1486,6 @@ async function connectToAIBot() {
 
 function setupDataChannel() {
   dataChannel.addEventListener("open", () => {
-    console.log("[Content] 🔗 Data channel opened");
     isConnected = true; // Set connected flag when data channel is actually open
     
     // Build AI instructions based on project context
@@ -1558,9 +1498,7 @@ function setupDataChannel() {
         projectContext.members,
         projectContext.lastPlans
       );
-      console.log("🤖 Using dynamic AI instructions with project context");
     } else {
-      console.log("📋 No project context available, using basic instructions");
     }
 
     const sessionUpdate = {
@@ -1578,55 +1516,33 @@ function setupDataChannel() {
       },
     };
     
-    console.log("[Content] 📤 Sending session update:", sessionUpdate);
     sendData(sessionUpdate);
   });
 
   dataChannel.addEventListener("message", (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log("[Content] 📨 Received data channel message:", data);
       handleServerEvent(data);
     } catch (error) {
-      console.error("[Content] ❌ Error parsing data channel message:", error);
-      console.error("[Content] ❌ Raw message:", event.data);
     }
   });
 
   dataChannel.addEventListener("error", (error) => {
-    console.error("[Content] ❌ Data channel error:", error);
   });
 }
 
 function sendData(data) {
-  console.log("[Content] 📡 sendData called with:", data);
-  console.log("[Content] 📡 DataChannel exists:", !!dataChannel);
-  console.log("[Content] 📡 DataChannel readyState:", dataChannel?.readyState);
-  
   if (dataChannel && dataChannel.readyState === "open") {
     try {
       const jsonData = JSON.stringify(data);
-      console.log("[Content] 📡 Sending JSON data:", jsonData);
       dataChannel.send(jsonData);
-      console.log("[Content] ✅ Data sent successfully");
     } catch (error) {
-      console.error("[Content] ❌ Error sending data:", error);
     }
-  } else {
-    console.error("[Content] ❌ Cannot send data - data channel not ready");
-    console.error("[Content] ❌ DataChannel state:", dataChannel?.readyState);
   }
 }
 
 // Start AI conversation with welcome message
 function startAIConversation() {
-  console.log("🚀 =================================");
-  console.log("🚀 STARTING NEW AI CONVERSATION");
-  console.log("[Content] 📋 Project context:", projectContext);
-  console.log("[Content] 🔗 DataChannel state:", dataChannel?.readyState);
-  console.log("[Content] 🔌 Is connected:", isConnected);
-  console.log(`📊 Current conversation length: ${conversation.length} messages`);
-  console.log("🚀 =================================");
   
   let welcomeInstructions = "Hello everyone! I'm your AI Scrum Master and I'm here to help facilitate your standup meeting today. I'm looking forward to hearing about the work you've been doing. Are you ready to begin?";
   
@@ -1640,9 +1556,7 @@ function startAIConversation() {
       : `Hello everyone! I'm excited to be here for your standup today. Let's begin, ${firstMember.name}! What did you work on yesterday?`;
 
     welcomeInstructions = `Say exactly: "${openingPrompt}" - use this natural and friendly greeting format.`;
-    console.log("🚀 Starting AI conversation with personalized greeting for", firstMember.name);
   } else {
-    console.log("🚀 Starting AI conversation with generic greeting");
   }
 
   const welcomeMessage = {
@@ -1653,9 +1567,7 @@ function startAIConversation() {
     },
   };
   
-  console.log("[Content] 📤 Sending welcome message:", welcomeMessage);
   sendData(welcomeMessage);
-  console.log("[Content] ✅ Welcome message sent");
 }
 
 // Audio completion checking
@@ -1840,14 +1752,6 @@ function handleServerEvent(event) {
         // Add to conversation history
         const userMsg = { role: "user", content: event.transcript.trim() };
         conversation.push(userMsg);
-        
-        // Console log for conversation tracking
-        console.log("🗣️ =================================");
-        console.log(`👤 USER TURN #${conversation.filter(msg => msg.role === 'user').length}:`);
-        console.log(`📝 Message: "${userMsg.content}"`);
-        console.log(`🕐 Time: ${new Date().toLocaleTimeString()}`);
-        console.log(`📊 Total conversation length: ${conversation.length} messages`);
-        console.log("🗣️ =================================");
       }
       return;
     }
@@ -1872,14 +1776,6 @@ function handleServerEvent(event) {
         const assistantMsg = { role: "assistant", content: finalTranscript };
         conversation.push(assistantMsg);
         
-        // Console log for conversation tracking
-        console.log("🤖 =================================");
-        console.log(`🎙️ ASSISTANT TURN #${conversation.filter(msg => msg.role === 'assistant').length}:`);
-        console.log(`📝 Message: "${assistantMsg.content}"`);
-        console.log(`🕐 Time: ${new Date().toLocaleTimeString()}`);
-        console.log(`📊 Total conversation length: ${conversation.length} messages`);
-        console.log("🤖 =================================");
-        
         // Check for member transition keywords
         const lower = finalTranscript.toLowerCase();
         if (
@@ -1893,7 +1789,6 @@ function handleServerEvent(event) {
           lower.includes("next:") ||
           (lower.includes("next") && (lower.includes("member") || lower.includes("person")))
         ) {
-          console.log("🔄 Detected member transition in AI response:", finalTranscript);
           handleMemberTransition();
         }
       }
@@ -1906,7 +1801,6 @@ function handleServerEvent(event) {
     handleAIEvent(event);
     
   } catch (error) {
-    // Error handling server event
   }
 }
 
@@ -1915,7 +1809,6 @@ function updatePopupWithAIResponse(message) {
   const popup = document.getElementById('ai-scrum-popup-card');
   if (popup) {
     // You can add a chat area to show the conversation
-    console.log("🤖 AI Response:", message);
   }
 }
 
@@ -1924,7 +1817,6 @@ function updatePopupWithUserMessage(message) {
   const popup = document.getElementById('ai-scrum-popup-card');
   if (popup) {
     // Display user message
-    console.log("👤 User Message:", message);
   }
 }
 
@@ -1932,7 +1824,6 @@ function updatePopupWithUserMessage(message) {
 function waitForToolbar() {
   const toolbar = document.querySelector('[aria-label="Call controls"]');
   if (toolbar) {
-
     // Prevent duplicate button injection
     if (!document.getElementById("ai-scrum-btn")) {
       const btn = document.createElement("button");
@@ -1963,22 +1854,8 @@ function waitForToolbar() {
 
 // Test function to verify microphone is working
 function testMicrophone() {
-  console.log("🧪 [TEST] Testing microphone functionality...");
-  console.log("🧪 [TEST] Current volume level:", volumeLevel.toFixed(1) + "%");
-  console.log("🧪 [TEST] Is user speaking:", isUserSpeaking);
-  console.log("🧪 [TEST] Is assistant speaking:", isAssistantSpeaking);
-  console.log("🧪 [TEST] Audio context state:", audioContext ? audioContext.state : "No audio context");
-  console.log("🧪 [TEST] Analyser available:", !!analyser);
-  console.log("🧪 [TEST] User audio track:", userAudioTrack ? {
-    enabled: userAudioTrack.enabled,
-    readyState: userAudioTrack.readyState,
-    muted: userAudioTrack.muted
-  } : "No track");
-  
   // Test popup update
   updatePopupMicrophoneStatus('Ready');
-  
-  console.log("🧪 [TEST] Microphone test completed. Speak to see volume changes!");
 }
 
 // Handle member transitions from AI responses
@@ -1987,14 +1864,10 @@ function handleMemberTransition() {
   if (nextIndex < projectContext.members.length) {
     projectContext.memberIndex = nextIndex;
     popupState.memberIndex = nextIndex; // Keep popup state in sync
-    console.log(`🔄 Moved to member ${nextIndex + 1} of ${projectContext.members.length}: ${projectContext.members[nextIndex]?.name}`);
     refreshPopup();
   } else {
-    console.log(`✅ Completed all ${projectContext.members.length} team members`);
-    
     // All members completed - but don't show download button automatically
     // User must manually stop the session to see the download button
-    console.log("📋 All team members completed. Click 'Stop Session' to save data and download Excel.");
   }
 }
 
@@ -2006,33 +1879,18 @@ window.testGetUserEmail = testGetUserEmail;
 
 // Test function to fetch user email using Chrome Identity API
 async function testGetUserEmail() {
-  console.log("🔍 [TEST] Testing Chrome Identity API email fetching...");
-  
   try {
     const response = await sendMessageToBackground('GET_USER_EMAIL');
     if (response.success) {
-      console.log("✅ [TEST] Email fetched successfully:", response.email);
       // You can also update the popup state with this email
       if (response.email && !popupState.userEmail) {
         popupState.userEmail = response.email;
-        console.log("📧 [TEST] Auto-filled email in popup state:", response.email);
       }
       return response.email;
     } else {
-      console.error("❌ [TEST] Failed to fetch email:", response.error);
-      
-      // If we have additional diagnostic info, show it
-      if (response.userInfo) {
-        console.log("📋 [TEST] User info details:", response.userInfo);
-      }
-      if (response.suggestion) {
-        console.log("💡 [TEST] Suggestion:", response.suggestion);
-      }
-      
       return null;
     }
   } catch (error) {
-    console.error("❌ [TEST] Error in testGetUserEmail:", error);
     return null;
   }
 }
