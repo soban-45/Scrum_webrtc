@@ -297,36 +297,3 @@ class DownloadExcelView(APIView):
             return Response({"error": f"Failed to download Excel file: {str(e)}"}, status=500)
         
 
-
-
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-import subprocess
-import sys
-
-@csrf_exempt
-def start_bot(request):
-    if request.method == "POST":
-        try:
-            body = json.loads(request.body.decode("utf-8"))
-            meet_url = body.get("meet_url")
-
-            if not meet_url:
-                return JsonResponse({"error": "Missing meetUrl"}, status=400)
-
-            # 🔹 Trigger bot runner in background
-            subprocess.Popen([sys.executable, "bot_runner.py", meet_url])
-
-            return JsonResponse({
-                "status": "ok",
-                "bot_started": True,
-                "meet_url": meet_url
-            })
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-    else:
-        return JsonResponse({"error": "Invalid method"}, status=405)
-
-
-
